@@ -1,16 +1,32 @@
-import "./globals.css";
+"use client";
+import React, { useEffect, useState } from 'react';
+import { createSupabaseBrowser } from '@/lib/supabase-browser';
 import Link from 'next/link';
-
-export const metadata = {
-  title: "AI Tư Vấn PCCC - Chuyên Gia Thông Minh",
-  description: "Trợ lý AI giúp tư vấn thiết kế, thẩm duyệt các tiêu chuẩn Phòng cháy chữa cháy (PCCC) chuyên nghiệp, an toàn, ngay lập tức và tuân thủ các quy định hiện hành.",
-};
+import "./globals.css";
 
 export default function RootLayout({ children }) {
+  const supabase = createSupabaseBrowser();
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+
+    // Lắng nghe thay đổi auth
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase]);
+
   return (
     <html lang="vi" suppressHydrationWarning>
       <body suppressHydrationWarning>
-        <nav className="navbar glass-panel" style={{ borderRadius: 0, borderTop: 0, borderLeft: 0, borderRight: 0, position: 'sticky' }}>
+        <nav className="navbar glass-panel" style={{ borderRadius: 0, borderTop: 0, borderLeft: 0, borderRight: 0, position: 'sticky', top: 0, zIndex: 1000 }}>
           <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Link href="/" className="logo">
               <span className="logo-icon">🔥</span>
@@ -23,9 +39,18 @@ export default function RootLayout({ children }) {
               <Link href="/guide">Hướng dẫn</Link>
             </div>
 
-            <div style={{ display: 'flex', gap: '16px' }}>
-              <Link href="/login" className="btn btn-secondary desktop-only" style={{ padding: '8px 24px' }}>Đăng nhập</Link>
-              <Link href="/consult" className="btn btn-primary" style={{ padding: '8px 24px' }}>Bắt đầu</Link>
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+              {user ? (
+                <>
+                  <Link href="/consult" className="btn btn-primary" style={{ padding: '8px 24px' }}>Dashboard</Link>
+                  <img src={user.user_metadata.avatar_url} alt="User" style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.1)' }} />
+                </>
+              ) : (
+                <>
+                  <Link href="/login" className="btn btn-secondary desktop-only" style={{ padding: '8px 24px' }}>Đăng nhập</Link>
+                  <Link href="/consult" className="btn btn-primary" style={{ padding: '8px 24px' }}>Bắt đầu</Link>
+                </>
+              )}
             </div>
           </div>
         </nav>

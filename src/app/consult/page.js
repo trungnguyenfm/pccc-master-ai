@@ -1,9 +1,15 @@
 "use client";
 import React, { useState, useRef, useEffect, Fragment } from 'react';
+import { useRouter } from 'next/navigation';
+import { createSupabaseBrowser } from '@/lib/supabase-browser';
 import { AI_SCRIPT } from '../../../ai_script';
 import './consult.css';
 
 export default function ConsultDashboard() {
+  const supabase = createSupabaseBrowser();
+  const router = useRouter();
+  const [user, setUser] = useState(null);
+  
   const [activeProject, setActiveProject] = useState('Dự án mặc định');
   const [projects, setProjects] = useState(['Dự án mặc định']);
   const [isPaidUser, setIsPaidUser] = useState(false);
@@ -17,30 +23,43 @@ export default function ConsultDashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // 1. KHỞI TẠO: Khôi phục danh sách dự án và dự án đang mở
+  // 1. KIỂM TRA ĐĂNG NHẬP
   useEffect(() => {
-    const savedProjects = localStorage.getItem('pccc_project_list');
-    const savedActive = localStorage.getItem('pccc_active_project');
-    const savedTier = localStorage.getItem('pccc_user_tier');
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/login');
+      } else {
+        setUser(user);
+        // Sau khi có user, load dự án riêng của user này
+        initUserProjects(user.id);
+      }
+    };
+    checkUser();
+  }, [supabase, router]);
+
+  // 2. KHỞI TẠO DỮ LIỆU RIÊNG CHO USER
+  const initUserProjects = (userId) => {
+    const savedProjects = localStorage.getItem(`pccc_projects_${userId}`);
+    const savedActive = localStorage.getItem(`pccc_active_${userId}`);
+    const savedTier = localStorage.getItem(`pccc_tier_${userId}`);
 
     if (savedTier) setIsPaidUser(savedTier === 'pro');
     
     if (savedProjects) {
       const list = JSON.parse(savedProjects);
       setProjects(list);
-      
       const current = savedActive || list[0];
       setActiveProject(current);
-      loadProjectData(current);
+      loadProjectData(current, userId);
     } else {
-      // Lần đầu tiên vào app
-      loadProjectData('Dự án mặc định');
+      loadProjectData('Dự án mặc định', userId);
     }
-  }, []);
+  };
 
-  // 2. LOGIC TẢI DỮ LIỆU CỦA 1 DỰ ÁN CỤ THỂ
-  const loadProjectData = (projectName) => {
-    const savedData = localStorage.getItem(`pccc_data_${projectName}`);
+  const loadProjectData = (projectName, userId) => {
+    const key = userId ? `pccc_data_${userId}_${projectName}` : `pccc_data_${projectName}`;
+    const savedData = localStorage.getItem(key);
     if (savedData) {
       const { info, chat } = JSON.parse(savedData);
       setProjectInfo(info || { scale: '', tier: 'A', area: '', fireResistance: 'I', totalArea: '', location: '', height: '', logic: '' });
@@ -51,29 +70,32 @@ export default function ConsultDashboard() {
     }
   };
 
-  // 3. AUTO-SAVE: Cập nhật dữ liệu vào localStorage mỗi khi thay đổi
+  // 3. AUTO-SAVE THEO USER ID
   useEffect(() => {
-    localStorage.setItem('pccc_project_list', JSON.stringify(projects));
-  }, [projects]);
+    if (!user) return;
+    localStorage.setItem(`pccc_projects_${user.id}`, JSON.stringify(projects));
+  }, [projects, user]);
 
   useEffect(() => {
-    localStorage.setItem('pccc_active_project', activeProject);
-    // Lưu dữ liệu của dự án hiện tại
+    if (!user) return;
+    localStorage.setItem(`pccc_active_${user.id}`, activeProject);
     const data = JSON.stringify({ info: projectInfo, chat: messages });
-    localStorage.setItem(`pccc_data_${activeProject}`, data);
-  }, [projectInfo, messages, activeProject]);
+    localStorage.setItem(`pccc_data_${user.id}_${activeProject}`, data);
+  }, [projectInfo, messages, activeProject, user]);
 
-  // 4. LOGIC CHUYỂN DỰ ÁN (CHUYỂN TAB)
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
+
   const handleSelectProject = (name) => {
     if (name === activeProject) return;
-    
-    // Lưu dữ liệu dự án cũ trước khi chuyển (đã có useEffect lo, nhưng cẩn thận ta có thể gọi load luôn)
     setActiveProject(name);
-    loadProjectData(name);
+    loadProjectData(name, user?.id);
   };
 
   const handleNewProject = () => {
-    if (!isPaidUser && projects.length >= 2) return; // Nút đã bị disabled nhưng vẫn chặn cho chắc
+    if (!isPaidUser && projects.length >= 2) return;
 
     const name = prompt("Nhập tên dự án mới:");
     if (name && name.trim()) {
@@ -82,22 +104,23 @@ export default function ConsultDashboard() {
       
       setProjects([...projects, newName]);
       setActiveProject(newName);
-      // Reset cho dự án mới
       setProjectInfo({ scale: '', tier: 'A', area: '', fireResistance: 'I', totalArea: '', location: '', height: '', logic: '' });
       setMessages([]);
     }
   };
 
   const handleEditProjectName = (e) => {
-    e.stopPropagation(); // Tránh kích hoạt sự kiện chọn dự án
+    e.stopPropagation();
     const newNameRaw = prompt("Đổi tên dự án thành:", activeProject);
     if (newNameRaw && newNameRaw.trim() && newNameRaw.trim() !== activeProject) {
       const newName = newNameRaw.trim();
       if (projects.includes(newName)) return alert("Tên dự án này đã bị trùng!");
       
-      const oldData = localStorage.getItem(`pccc_data_${activeProject}`);
-      if (oldData) localStorage.setItem(`pccc_data_${newName}`, oldData);
-      localStorage.removeItem(`pccc_data_${activeProject}`);
+      const oldKey = `pccc_data_${user.id}_${activeProject}`;
+      const newKey = `pccc_data_${user.id}_${newName}`;
+      const oldData = localStorage.getItem(oldKey);
+      if (oldData) localStorage.setItem(newKey, oldData);
+      localStorage.removeItem(oldKey);
 
       setProjects(projects.map(p => p === activeProject ? newName : p));
       setActiveProject(newName);
@@ -149,9 +172,19 @@ export default function ConsultDashboard() {
     }
   };
 
+  if (!user) return <div style={{ backgroundColor: '#0d0d0d', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>Đang xác thực...</div>;
+
   return (
     <div className="dashboard-container">
       <aside className="sidebar">
+        <div className="user-profile" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px' }}>
+          <img src={user.user_metadata.avatar_url} alt="Avatar" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
+          <div style={{ overflow: 'hidden' }}>
+            <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: '600', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.user_metadata.full_name}</p>
+            <p style={{ margin: 0, fontSize: '0.7rem', color: '#9ca3af', cursor: 'pointer' }} onClick={handleLogout}>Đăng xuất →</p>
+          </div>
+        </div>
+
         <h1 className="sidebar-brand">
           PCCC Master <span className="tier-badge pro">Pro</span>
         </h1>
@@ -190,7 +223,7 @@ export default function ConsultDashboard() {
           onClick={() => {
             const next = !isPaidUser;
             setIsPaidUser(next);
-            localStorage.setItem('pccc_user_tier', next ? 'pro' : 'free');
+            localStorage.setItem(`pccc_tier_${user.id}`, next ? 'pro' : 'free');
           }}
         >
           {isPaidUser ? "[Gói PRO - Không giới hạn]" : "[Gói FREE - Click để lên PRO]"}
