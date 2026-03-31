@@ -168,7 +168,7 @@ export default function ConsultDashboard() {
                   <div className="message-bubble">{m.content}</div>
                 </div>
               ))}
-              {isLoading && <div className="chat-message assistant"><div className="message-bubble loading">AI đang lật mở 106 cuốn tài liệu rà soát...</div></div>}
+              {isLoading && <div className="chat-message assistant"><div className="message-bubble loading">Đang suy nghĩ ...</div></div>}
               <div ref={messagesEndRef} />
             </div>
 
