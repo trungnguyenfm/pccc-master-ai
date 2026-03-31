@@ -1,0 +1,361 @@
+.dashboard-container {
+  display: flex;
+  color-scheme: dark;
+  min-height: calc(100vh - 75px); /* Subtract root navbar height approx */
+  background-color: #0d0d0d;
+  color: #e5e7eb;
+  font-family: inherit;
+  margin: -32px 0 -32px 0; /* Negate the defaults if any from Layout */
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 100;
+}
+
+.sidebar {
+  width: 250px;
+  background-color: #1a1a1a;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(0,0,0,0.1);
+}
+
+.sidebar-brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 32px;
+}
+
+.sidebar-section-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #a0a3ac;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+.project-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex: 1;
+}
+
+.project-item {
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #d1d5db;
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+
+.project-item:hover {
+  background-color: rgba(255,255,255,0.05);
+}
+
+.project-item.active {
+  background-color: rgba(255,255,255,0.1);
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.btn-new-project {
+  margin-top: auto;
+  background-color: #8473c3;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-new-project:hover {
+  background-color: #7262b0;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 32px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.header-title {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #f3f4f6;
+  margin: 0;
+}
+
+.btn-fullscreen {
+  background-color: #2a2a2e;
+  color: #ffffff;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.form-section {
+  padding: 32px;
+  max-width: 900px;
+}
+
+.form-title {
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: #ffffff;
+  margin-bottom: 24px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-group label {
+  font-size: 0.9rem;
+  color: #d1d5db;
+}
+
+.form-group input, .form-group select, .form-group textarea {
+  background-color: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 6px;
+  padding: 12px;
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+  outline: none;
+  border-color: #8473c3;
+  background-color: rgba(255,255,255,0.12);
+}
+
+.form-group input::placeholder, .form-group textarea::placeholder {
+  color: #9ca3af;
+}
+
+/* Sửa lỗi hiển thị chữ trắng nền trắng của thẻ option (dropdown) Windows mặc định */
+.form-group select option {
+  background-color: #1a1a1a;
+  color: #ffffff;
+}
+
+.btn-start-chat {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-start-chat:hover {
+  background-color: #2563eb;
+}
+
+/* THÊM MỚI: Bố cục chia đôi màn hình Form và Chat */
+.dashboard-split {
+  display: flex;
+  flex: 1;
+  padding: 32px;
+  gap: 32px;
+  overflow: hidden; /* Prevent scrolling whole page, scroll individually */
+}
+
+.split-left {
+  flex: 1;
+  max-width: 500px;
+  padding: 0;
+  overflow-y: auto;
+  padding-right: 16px; /* For scrollbar breathing room */
+}
+
+.split-right {
+  flex: 1.5; /* Chat box takes slightly more space */
+  display: flex;
+  flex-direction: column;
+  background-color: #16181d;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.05);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+
+.chat-section .form-title {
+  padding: 20px 24px;
+  margin: 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 1.1rem;
+}
+
+.chat-history {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chat-welcome {
+  background-color: rgba(132, 115, 195, 0.1);
+  border: 1px solid rgba(132, 115, 195, 0.2);
+  padding: 16px;
+  border-radius: 8px;
+  color: #c4b5fd;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.chat-welcome p { margin: 0 0 8px 0; }
+.chat-welcome p:last-child { margin: 0; }
+
+.chat-message {
+  display: flex;
+  width: 100%;
+}
+
+.chat-message.user {
+  justify-content: flex-end;
+}
+
+.chat-message.assistant {
+  justify-content: flex-start;
+}
+
+.message-bubble {
+  max-width: 85%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.chat-message.user .message-bubble {
+  background-color: #3b82f6; 
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.chat-message.assistant .message-bubble {
+  background-color: #2d303a;
+  color: #e5e7eb;
+  border-bottom-left-radius: 4px;
+}
+
+.message-bubble.loading {
+  background-color: transparent;
+  color: #9ca3af;
+  font-style: italic;
+  padding: 0;
+}
+
+.chat-input-area {
+  display: flex;
+  padding: 16px 20px;
+  background-color: #1a1b20;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  gap: 12px;
+}
+
+.chat-input {
+  flex: 1;
+  background-color: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 24px;
+  padding: 12px 20px;
+  color: white;
+  font-size: 0.95rem;
+}
+
+.chat-input:focus {
+  outline: none;
+  border-color: #8473c3;
+}
+
+.chat-send-btn {
+  background-color: #8473c3;
+  color: white;
+  border: none;
+  border-radius: 24px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 24px;
+  transition: all 0.2s;
+}
+
+.chat-send-btn:hover:not(:disabled) {
+  background-color: #7262b0;
+}
+
+.chat-send-btn:disabled {
+  background-color: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.3);
+  cursor: not-allowed;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-split {
+    flex-direction: column;
+    overflow: auto;
+  }
+  .split-left, .split-right {
+    max-width: 100%;
+    overflow: visible;
+  }
+  .split-right {
+    min-height: 500px;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-container {
+    flex-direction: column;
+    position: relative;
+    padding-bottom: 24px;
+  }
+  .sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .btn-new-project {
+    margin-top: 16px;
+  }
+}
