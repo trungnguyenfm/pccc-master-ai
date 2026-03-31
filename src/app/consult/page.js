@@ -4,19 +4,49 @@ import { AI_SCRIPT } from '../../../ai_script';
 import './consult.css';
 
 export default function ConsultDashboard() {
-  const [activeProject, setActiveProject] = useState('Karaoke A');
-  const [projects, setProjects] = useState(['Karaoke A', 'Kho B']);
+  const [activeProject, setActiveProject] = useState('Dự án mặc định');
+  const [projects, setProjects] = useState(['Dự án mặc định']);
   
-  // Trạng thái thu thập thông tin công trình
   const [projectInfo, setProjectInfo] = useState({
     scale: '', tier: 'A', area: '', fireResistance: 'I', totalArea: '', location: '', height: '', logic: ''
   });
 
-  // Tự xây dựng AI Chat Hook 100% Native (Triệt tiêu mọi lỗi từ Vercel SDK)
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
+
+  // 1. Tự động Khôi phục dữ liệu từ Bộ nhớ trình duyệt (localStorage) khi F5
+  useEffect(() => {
+    const savedInfo = localStorage.getItem('pccc_project_info');
+    const savedProject = localStorage.getItem('pccc_active_project');
+    if (savedInfo) setProjectInfo(JSON.parse(savedInfo));
+    if (savedProject) {
+      setActiveProject(savedProject);
+      setProjects([savedProject]);
+    }
+  }, []);
+
+  // 2. Tự động Ghi đè dữ liệu vào Bộ nhớ mỗi khi có thay đổi
+  useEffect(() => {
+    localStorage.setItem('pccc_project_info', JSON.stringify(projectInfo));
+  }, [projectInfo]);
+
+  useEffect(() => {
+    localStorage.setItem('pccc_active_project', activeProject);
+  }, [activeProject]);
+
+  const handleNewProject = () => {
+    const name = prompt("Nhập tên dự án mới:");
+    if (name && name.trim()) {
+      setActiveProject(name);
+      setProjects([name]);
+      // Reset form cho dự án mới
+      const newInfo = { scale: '', tier: 'A', area: '', fireResistance: 'I', totalArea: '', location: '', height: '', logic: '' };
+      setProjectInfo(newInfo);
+      setMessages([]); // Xóa lịch sử chat dự án cũ
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -40,20 +70,14 @@ export default function ConsultDashboard() {
       });
 
       if (!response.ok) throw new Error(await response.text());
-
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
-      
-      // Tạo trước bong bóng chat của AI
       setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        
         const chunk = decoder.decode(value, { stream: true });
-        
-        // Cập nhật từng chữ lả tả rơi
         setMessages(prev => {
           const newArray = [...prev];
           const lastMsg = newArray[newArray.length - 1];
@@ -71,27 +95,19 @@ export default function ConsultDashboard() {
 
   return (
     <div className="dashboard-container">
-      {/* Sidebar không đổi */}
       <aside className="sidebar">
         <h1 className="sidebar-brand">PCCC Master Pro</h1>
         <div className="sidebar-section">
-          <p className="sidebar-section-title">DỰ ÁN</p>
+          <p className="sidebar-section-title">DỰ ÁN HIỆN TẠI</p>
           <ul className="project-list">
-            {projects.map(proj => (
-              <li 
-                key={proj} 
-                className={`project-item ${activeProject === proj ? 'active' : ''}`}
-                onClick={() => setActiveProject(proj)}
-              >
-                {proj}
-              </li>
-            ))}
+            <li className="project-item active">
+              {activeProject}
+            </li>
           </ul>
         </div>
-        <button className="btn-new-project">+ Dự án mới</button>
+        <button className="btn-new-project" onClick={handleNewProject}>+ Dự án mới</button>
       </aside>
 
-      {/* Main Content chia 2 nửa */}
       <main className="main-content">
         <header className="main-header">
           <h2 className="header-title">Dự án: {activeProject}</h2>
@@ -99,13 +115,17 @@ export default function ConsultDashboard() {
         </header>
 
         <div className="dashboard-split">
-          {/* Nửa trái: Form nhập liệu PCCC */}
           <section className="form-section split-left">
             <h3 className="form-title">Thông số Công Trình</h3>
             <div className="form-grid">
               <div className="form-group">
                 <label>Quy mô (Số tầng nổi/hầm)</label>
-                <input type="text" placeholder="VD: 10 tầng nổi, 2 tầng hầm" onChange={(e)=>setProjectInfo({...projectInfo, scale: e.target.value})}/>
+                <input 
+                  type="text" 
+                  value={projectInfo.scale}
+                  placeholder="VD: 10 tầng nổi, 2 tầng hầm" 
+                  onChange={(e)=>setProjectInfo({...projectInfo, scale: e.target.value})}
+                />
               </div>
               <div className="form-group">
                 <label>Hạng sản xuất (nếu có)</label>
@@ -115,7 +135,12 @@ export default function ConsultDashboard() {
               </div>
               <div className="form-group">
                 <label>Diện tích sàn (m²)</label>
-                <input type="text" placeholder="VD: 500" onChange={(e)=>setProjectInfo({...projectInfo, area: e.target.value})}/>
+                <input 
+                  type="text" 
+                  value={projectInfo.area}
+                  placeholder="VD: 500" 
+                  onChange={(e)=>setProjectInfo({...projectInfo, area: e.target.value})}
+                />
               </div>
               <div className="form-group">
                 <label>Bậc chịu lửa</label>
@@ -125,31 +150,48 @@ export default function ConsultDashboard() {
               </div>
               <div className="form-group">
                 <label>Tổng diện tích</label>
-                <input type="text" placeholder="VD: 1.2ha" onChange={(e)=>setProjectInfo({...projectInfo, totalArea: e.target.value})}/>
+                <input 
+                  type="text" 
+                  value={projectInfo.totalArea}
+                  placeholder="VD: 1.2ha" 
+                  onChange={(e)=>setProjectInfo({...projectInfo, totalArea: e.target.value})}
+                />
               </div>
               <div className="form-group">
                 <label>Vị trí</label>
-                <input type="text" placeholder="Khoảng cách đường..." onChange={(e)=>setProjectInfo({...projectInfo, location: e.target.value})}/>
+                <input 
+                  type="text" 
+                  value={projectInfo.location}
+                  placeholder="Khoảng cách đường..." 
+                  onChange={(e)=>setProjectInfo({...projectInfo, location: e.target.value})}
+                />
               </div>
               <div className="form-group">
                 <label>Chiều cao PCCC (m)</label>
-                <input type="text" placeholder="VD: 45.5" onChange={(e)=>setProjectInfo({...projectInfo, height: e.target.value})}/>
+                <input 
+                  type="text" 
+                  value={projectInfo.height}
+                  placeholder="VD: 45.5" 
+                  onChange={(e)=>setProjectInfo({...projectInfo, height: e.target.value})}
+                />
               </div>
               <div className="form-group full-width">
                 <label>Công năng chi tiết từng tầng</label>
-                <textarea rows={3} placeholder="Ví dụ: Tầng 1: Để xe, Tầng 2: Văn phòng..." onChange={(e)=>setProjectInfo({...projectInfo, logic: e.target.value})}></textarea>
+                <textarea 
+                  rows={3} 
+                  value={projectInfo.logic}
+                  placeholder="Ví dụ: Tầng 1: Để xe, Tầng 2: Văn phòng..." 
+                  onChange={(e)=>setProjectInfo({...projectInfo, logic: e.target.value})}
+                ></textarea>
               </div>
             </div>
-            
             <p className="hint-text mt-4 text-gray-500 text-sm italic">
-              *Hệ thống AI sẽ tự động đọc các thông số này mỗi khi bạn đặt câu hỏi.
+              *Dữ liệu tự động lưu và chuyển vào AI mỗi khi bạn thay đổi thông số.
             </p>
           </section>
 
-          {/* Nửa phải: Cửa sổ Chat bot AI */}
           <section className="chat-section split-right">
             <h3 className="form-title">Chuyên Gia AI Thẩm Duyệt</h3>
-            
             <div className="chat-history">
               {messages.length === 0 && (
                 <div className="chat-welcome">
@@ -185,7 +227,6 @@ export default function ConsultDashboard() {
               </button>
             </form>
           </section>
-
         </div>
       </main>
     </div>
