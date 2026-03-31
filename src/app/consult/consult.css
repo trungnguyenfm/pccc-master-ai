@@ -60,6 +60,46 @@
   background-color: rgba(255,255,255,0.1);
   color: #ffffff;
   font-weight: 500;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn-edit-project {
+  background: transparent;
+  border: none;
+  color: #a0a3ac;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-edit-project:hover {
+  color: #ffffff;
+  background-color: rgba(255,255,255,0.1);
+}
+
+.tier-badge {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-left: 8px;
+}
+
+.tier-badge.free {
+  background-color: #4b5563;
+  color: #d1d5db;
+}
+
+.tier-badge.pro {
+  background-color: #fbbf24;
+  color: #78350f;
 }
 
 .btn-new-project {

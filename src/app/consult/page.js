@@ -6,6 +6,7 @@ import './consult.css';
 export default function ConsultDashboard() {
   const [activeProject, setActiveProject] = useState('Dự án mặc định');
   const [projects, setProjects] = useState(['Dự án mặc định']);
+  const [isPaidUser, setIsPaidUser] = useState(false); // Mock cho phân hạng (có thể kết nối từ DB sau)
   
   const [projectInfo, setProjectInfo] = useState({
     scale: '', tier: 'A', area: '', fireResistance: 'I', totalArea: '', location: '', height: '', logic: ''
@@ -18,33 +19,76 @@ export default function ConsultDashboard() {
 
   // 1. Tự động Khôi phục dữ liệu từ Bộ nhớ trình duyệt (localStorage) khi F5
   useEffect(() => {
-    const savedInfo = localStorage.getItem('pccc_project_info');
-    const savedProject = localStorage.getItem('pccc_active_project');
-    if (savedInfo) setProjectInfo(JSON.parse(savedInfo));
-    if (savedProject) {
-      setActiveProject(savedProject);
-      setProjects([savedProject]);
+    const savedProjects = localStorage.getItem('pccc_project_list');
+    const savedActive = localStorage.getItem('pccc_active_project');
+    const savedTier = localStorage.getItem('pccc_user_tier');
+
+    if (savedTier) setIsPaidUser(savedTier === 'pro');
+    if (savedProjects) setProjects(JSON.parse(savedProjects));
+    if (savedActive) {
+      setActiveProject(savedActive);
+      // Load dữ liệu riêng của dự án này
+      const savedData = localStorage.getItem(`pccc_data_${savedActive}`);
+      if (savedData) {
+        const { info, chat } = JSON.parse(savedData);
+        if (info) setProjectInfo(info);
+        if (chat) setMessages(chat);
+      }
     }
   }, []);
 
   // 2. Tự động Ghi đè dữ liệu vào Bộ nhớ mỗi khi có thay đổi
   useEffect(() => {
-    localStorage.setItem('pccc_project_info', JSON.stringify(projectInfo));
-  }, [projectInfo]);
+    localStorage.setItem('pccc_project_list', JSON.stringify(projects));
+  }, [projects]);
 
   useEffect(() => {
     localStorage.setItem('pccc_active_project', activeProject);
   }, [activeProject]);
 
+  useEffect(() => {
+    const data = JSON.stringify({ info: projectInfo, chat: messages });
+    localStorage.setItem(`pccc_data_${activeProject}`, data);
+  }, [projectInfo, messages, activeProject]);
+
   const handleNewProject = () => {
+    if (!isPaidUser && projects.length >= 2) {
+      alert("⚠️ Tài khoản MIỄN PHÍ chỉ được tối đa 2 dự án. Vui lòng nâng cấp PRO để không giới hạn!");
+      return;
+    }
+
     const name = prompt("Nhập tên dự án mới:");
     if (name && name.trim()) {
-      setActiveProject(name);
-      setProjects([name]);
-      // Reset form cho dự án mới
-      const newInfo = { scale: '', tier: 'A', area: '', fireResistance: 'I', totalArea: '', location: '', height: '', logic: '' };
-      setProjectInfo(newInfo);
-      setMessages([]); // Xóa lịch sử chat dự án cũ
+      if (projects.includes(name.trim())) {
+        alert("Dự án này đã tồn tại!");
+        return;
+      }
+      const newName = name.trim();
+      setProjects([...projects, newName]);
+      setActiveProject(newName);
+      // Reset cho dự án mới
+      setProjectInfo({ scale: '', tier: 'A', area: '', fireResistance: 'I', totalArea: '', location: '', height: '', logic: '' });
+      setMessages([]);
+    }
+  };
+
+  const handleEditProjectName = () => {
+    const newNameRaw = prompt("Đổi tên dự án thành:", activeProject);
+    if (newNameRaw && newNameRaw.trim() && newNameRaw.trim() !== activeProject) {
+      const newName = newNameRaw.trim();
+      if (projects.includes(newName)) {
+        alert("Tên dự án này đã bị trùng!");
+        return;
+      }
+      
+      // Di chuyển dữ liệu cũ sang tên mới trong localStorage
+      const oldData = localStorage.getItem(`pccc_data_${activeProject}`);
+      if (oldData) localStorage.setItem(`pccc_data_${newName}`, oldData);
+      localStorage.removeItem(`pccc_data_${activeProject}`);
+
+      // Cập nhật danh sách dự án
+      setProjects(projects.map(p => p === activeProject ? newName : p));
+      setActiveProject(newName);
     }
   };
 
@@ -96,16 +140,36 @@ export default function ConsultDashboard() {
   return (
     <div className="dashboard-container">
       <aside className="sidebar">
-        <h1 className="sidebar-brand">PCCC Master Pro</h1>
+        <h1 className="sidebar-brand">
+          PCCC Master <span className="tier-badge pro">Pro</span>
+        </h1>
         <div className="sidebar-section">
-          <p className="sidebar-section-title">DỰ ÁN HIỆN TẠI</p>
+          <p className="sidebar-section-title">
+            QUẢN LÝ DỰ ÁN ({projects.length}/2) 
+            {!isPaidUser && <span className="tier-badge free">Free</span>}
+          </p>
           <ul className="project-list">
             <li className="project-item active">
-              {activeProject}
+              <span>{activeProject}</span>
+              <button className="btn-edit-project" onClick={handleEditProjectName} title="Sửa tên dự án">
+                ✏️
+              </button>
             </li>
           </ul>
         </div>
         <button className="btn-new-project" onClick={handleNewProject}>+ Dự án mới</button>
+        
+        {/* Toggle ẩn cho Sếp test bản Pro (có thể bỏ khi chạy thật) */}
+        <p 
+          style={{ fontSize: '10px', color: '#333', cursor: 'pointer', marginTop: '10px' }}
+          onClick={() => {
+            const next = !isPaidUser;
+            setIsPaidUser(next);
+            localStorage.setItem('pccc_user_tier', next ? 'pro' : 'free');
+          }}
+        >
+          {isPaidUser ? "[Đang dùng bản PRO]" : "[Đang dùng bản FREE] - Ấn đây để đổi gói"}
+        </p>
       </aside>
 
       <main className="main-content">
@@ -185,9 +249,6 @@ export default function ConsultDashboard() {
                 ></textarea>
               </div>
             </div>
-            <p className="hint-text mt-4 text-gray-500 text-sm italic">
-              *Dữ liệu tự động lưu và chuyển vào AI mỗi khi bạn thay đổi thông số.
-            </p>
           </section>
 
           <section className="chat-section split-right">
