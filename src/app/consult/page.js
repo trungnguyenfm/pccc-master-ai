@@ -6,7 +6,7 @@ import './consult.css';
 export default function ConsultDashboard() {
   const [activeProject, setActiveProject] = useState('Dự án mặc định');
   const [projects, setProjects] = useState(['Dự án mặc định']);
-  const [isPaidUser, setIsPaidUser] = useState(false); // Mock cho phân hạng (có thể kết nối từ DB sau)
+  const [isPaidUser, setIsPaidUser] = useState(false);
   
   const [projectInfo, setProjectInfo] = useState({
     scale: '', tier: 'A', area: '', fireResistance: 'I', totalArea: '', location: '', height: '', logic: ''
@@ -17,53 +17,69 @@ export default function ConsultDashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // 1. Tự động Khôi phục dữ liệu từ Bộ nhớ trình duyệt (localStorage) khi F5
+  // 1. KHỞI TẠO: Khôi phục danh sách dự án và dự án đang mở
   useEffect(() => {
     const savedProjects = localStorage.getItem('pccc_project_list');
     const savedActive = localStorage.getItem('pccc_active_project');
     const savedTier = localStorage.getItem('pccc_user_tier');
 
     if (savedTier) setIsPaidUser(savedTier === 'pro');
-    if (savedProjects) setProjects(JSON.parse(savedProjects));
-    if (savedActive) {
-      setActiveProject(savedActive);
-      // Load dữ liệu riêng của dự án này
-      const savedData = localStorage.getItem(`pccc_data_${savedActive}`);
-      if (savedData) {
-        const { info, chat } = JSON.parse(savedData);
-        if (info) setProjectInfo(info);
-        if (chat) setMessages(chat);
-      }
+    
+    if (savedProjects) {
+      const list = JSON.parse(savedProjects);
+      setProjects(list);
+      
+      const current = savedActive || list[0];
+      setActiveProject(current);
+      loadProjectData(current);
+    } else {
+      // Lần đầu tiên vào app
+      loadProjectData('Dự án mặc định');
     }
   }, []);
 
-  // 2. Tự động Ghi đè dữ liệu vào Bộ nhớ mỗi khi có thay đổi
+  // 2. LOGIC TẢI DỮ LIỆU CỦA 1 DỰ ÁN CỤ THỂ
+  const loadProjectData = (projectName) => {
+    const savedData = localStorage.getItem(`pccc_data_${projectName}`);
+    if (savedData) {
+      const { info, chat } = JSON.parse(savedData);
+      setProjectInfo(info || { scale: '', tier: 'A', area: '', fireResistance: 'I', totalArea: '', location: '', height: '', logic: '' });
+      setMessages(chat || []);
+    } else {
+      setProjectInfo({ scale: '', tier: 'A', area: '', fireResistance: 'I', totalArea: '', location: '', height: '', logic: '' });
+      setMessages([]);
+    }
+  };
+
+  // 3. AUTO-SAVE: Cập nhật dữ liệu vào localStorage mỗi khi thay đổi
   useEffect(() => {
     localStorage.setItem('pccc_project_list', JSON.stringify(projects));
   }, [projects]);
 
   useEffect(() => {
     localStorage.setItem('pccc_active_project', activeProject);
-  }, [activeProject]);
-
-  useEffect(() => {
+    // Lưu dữ liệu của dự án hiện tại
     const data = JSON.stringify({ info: projectInfo, chat: messages });
     localStorage.setItem(`pccc_data_${activeProject}`, data);
   }, [projectInfo, messages, activeProject]);
 
+  // 4. LOGIC CHUYỂN DỰ ÁN (CHUYỂN TAB)
+  const handleSelectProject = (name) => {
+    if (name === activeProject) return;
+    
+    // Lưu dữ liệu dự án cũ trước khi chuyển (đã có useEffect lo, nhưng cẩn thận ta có thể gọi load luôn)
+    setActiveProject(name);
+    loadProjectData(name);
+  };
+
   const handleNewProject = () => {
-    if (!isPaidUser && projects.length >= 2) {
-      alert("⚠️ Tài khoản MIỄN PHÍ chỉ được tối đa 2 dự án. Vui lòng nâng cấp PRO để không giới hạn!");
-      return;
-    }
+    if (!isPaidUser && projects.length >= 2) return; // Nút đã bị disabled nhưng vẫn chặn cho chắc
 
     const name = prompt("Nhập tên dự án mới:");
     if (name && name.trim()) {
-      if (projects.includes(name.trim())) {
-        alert("Dự án này đã tồn tại!");
-        return;
-      }
       const newName = name.trim();
+      if (projects.includes(newName)) return alert("Dự án này đã tồn tại!");
+      
       setProjects([...projects, newName]);
       setActiveProject(newName);
       // Reset cho dự án mới
@@ -72,21 +88,17 @@ export default function ConsultDashboard() {
     }
   };
 
-  const handleEditProjectName = () => {
+  const handleEditProjectName = (e) => {
+    e.stopPropagation(); // Tránh kích hoạt sự kiện chọn dự án
     const newNameRaw = prompt("Đổi tên dự án thành:", activeProject);
     if (newNameRaw && newNameRaw.trim() && newNameRaw.trim() !== activeProject) {
       const newName = newNameRaw.trim();
-      if (projects.includes(newName)) {
-        alert("Tên dự án này đã bị trùng!");
-        return;
-      }
+      if (projects.includes(newName)) return alert("Tên dự án này đã bị trùng!");
       
-      // Di chuyển dữ liệu cũ sang tên mới trong localStorage
       const oldData = localStorage.getItem(`pccc_data_${activeProject}`);
       if (oldData) localStorage.setItem(`pccc_data_${newName}`, oldData);
       localStorage.removeItem(`pccc_data_${activeProject}`);
 
-      // Cập nhật danh sách dự án
       setProjects(projects.map(p => p === activeProject ? newName : p));
       setActiveProject(newName);
     }
@@ -145,21 +157,34 @@ export default function ConsultDashboard() {
         </h1>
         <div className="sidebar-section">
           <p className="sidebar-section-title">
-            QUẢN LÝ DỰ ÁN ({projects.length}/2) 
+            DANH SÁCH DỰ ÁN ({projects.length}/2) 
             {!isPaidUser && <span className="tier-badge free">Free</span>}
           </p>
           <ul className="project-list">
-            <li className="project-item active">
-              <span>{activeProject}</span>
-              <button className="btn-edit-project" onClick={handleEditProjectName} title="Sửa tên dự án">
-                ✏️
-              </button>
-            </li>
+            {projects.map(proj => (
+              <li 
+                key={proj} 
+                className={`project-item ${activeProject === proj ? 'active' : ''}`}
+                onClick={() => handleSelectProject(proj)}
+              >
+                <span>{proj}</span>
+                {activeProject === proj && (
+                  <button className="btn-edit-project" onClick={handleEditProjectName} title="Sửa tên dự án">
+                    ✏️
+                  </button>
+                )}
+              </li>
+            ))}
           </ul>
         </div>
-        <button className="btn-new-project" onClick={handleNewProject}>+ Dự án mới</button>
+        <button 
+          className="btn-new-project" 
+          onClick={handleNewProject}
+          disabled={!isPaidUser && projects.length >= 2}
+        >
+          {!isPaidUser && projects.length >= 2 ? "Hết lượt (Nâng Pro)" : "+ Dự án mới"}
+        </button>
         
-        {/* Toggle ẩn cho Sếp test bản Pro (có thể bỏ khi chạy thật) */}
         <p 
           style={{ fontSize: '10px', color: '#333', cursor: 'pointer', marginTop: '10px' }}
           onClick={() => {
@@ -168,13 +193,13 @@ export default function ConsultDashboard() {
             localStorage.setItem('pccc_user_tier', next ? 'pro' : 'free');
           }}
         >
-          {isPaidUser ? "[Đang dùng bản PRO]" : "[Đang dùng bản FREE] - Ấn đây để đổi gói"}
+          {isPaidUser ? "[Gói PRO - Không giới hạn]" : "[Gói FREE - Click để lên PRO]"}
         </p>
       </aside>
 
       <main className="main-content">
         <header className="main-header">
-          <h2 className="header-title">Dự án: {activeProject}</h2>
+          <h2 className="header-title">Đang làm: {activeProject}</h2>
           <button className="btn-fullscreen">Fullscreen</button>
         </header>
 
@@ -184,27 +209,17 @@ export default function ConsultDashboard() {
             <div className="form-grid">
               <div className="form-group">
                 <label>Quy mô (Số tầng nổi/hầm)</label>
-                <input 
-                  type="text" 
-                  value={projectInfo.scale}
-                  placeholder="VD: 10 tầng nổi, 2 tầng hầm" 
-                  onChange={(e)=>setProjectInfo({...projectInfo, scale: e.target.value})}
-                />
+                <input type="text" value={projectInfo.scale} placeholder="VD: 10 tầng nổi" onChange={(e)=>setProjectInfo({...projectInfo, scale: e.target.value})}/>
               </div>
               <div className="form-group">
-                <label>Hạng sản xuất (nếu có)</label>
+                <label>Hạng sản xuất</label>
                 <select value={projectInfo.tier} onChange={(e)=>setProjectInfo({...projectInfo, tier: e.target.value})}>
                   <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="Không có">Không có / Dân dụng</option>
                 </select>
               </div>
               <div className="form-group">
                 <label>Diện tích sàn (m²)</label>
-                <input 
-                  type="text" 
-                  value={projectInfo.area}
-                  placeholder="VD: 500" 
-                  onChange={(e)=>setProjectInfo({...projectInfo, area: e.target.value})}
-                />
+                <input type="text" value={projectInfo.area} placeholder="500" onChange={(e)=>setProjectInfo({...projectInfo, area: e.target.value})}/>
               </div>
               <div className="form-group">
                 <label>Bậc chịu lửa</label>
@@ -214,39 +229,15 @@ export default function ConsultDashboard() {
               </div>
               <div className="form-group">
                 <label>Tổng diện tích</label>
-                <input 
-                  type="text" 
-                  value={projectInfo.totalArea}
-                  placeholder="VD: 1.2ha" 
-                  onChange={(e)=>setProjectInfo({...projectInfo, totalArea: e.target.value})}
-                />
-              </div>
-              <div className="form-group">
-                <label>Vị trí</label>
-                <input 
-                  type="text" 
-                  value={projectInfo.location}
-                  placeholder="Khoảng cách đường..." 
-                  onChange={(e)=>setProjectInfo({...projectInfo, location: e.target.value})}
-                />
+                <input type="text" value={projectInfo.totalArea} placeholder="1.2ha" onChange={(e)=>setProjectInfo({...projectInfo, totalArea: e.target.value})}/>
               </div>
               <div className="form-group">
                 <label>Chiều cao PCCC (m)</label>
-                <input 
-                  type="text" 
-                  value={projectInfo.height}
-                  placeholder="VD: 45.5" 
-                  onChange={(e)=>setProjectInfo({...projectInfo, height: e.target.value})}
-                />
+                <input type="text" value={projectInfo.height} placeholder="45.5" onChange={(e)=>setProjectInfo({...projectInfo, height: e.target.value})}/>
               </div>
               <div className="form-group full-width">
-                <label>Công năng chi tiết từng tầng</label>
-                <textarea 
-                  rows={3} 
-                  value={projectInfo.logic}
-                  placeholder="Ví dụ: Tầng 1: Để xe, Tầng 2: Văn phòng..." 
-                  onChange={(e)=>setProjectInfo({...projectInfo, logic: e.target.value})}
-                ></textarea>
+                <label>Công năng / Tum / Hầm</label>
+                <textarea rows={3} value={projectInfo.logic} placeholder="..." onChange={(e)=>setProjectInfo({...projectInfo, logic: e.target.value})}></textarea>
               </div>
             </div>
           </section>
@@ -280,12 +271,10 @@ export default function ConsultDashboard() {
                 className="chat-input"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Nhập câu hỏi, ví dụ: 'Ban công nhỏ 1.2m có cần lắp Spinkler?'"
+                placeholder="Nhập câu hỏi tại đây..."
                 disabled={isLoading}
               />
-              <button className="chat-send-btn" type="submit" disabled={isLoading || !input.trim()}>
-                Hỏi
-              </button>
+              <button className="chat-send-btn" type="submit" disabled={isLoading || !input.trim()}>Hỏi</button>
             </form>
           </section>
         </div>
