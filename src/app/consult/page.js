@@ -58,7 +58,7 @@ export default function ConsultDashboard() {
   };
 
   const loadProjectData = (projectName, userId) => {
-    const key = userId ? `pccc_data_${userId}_${projectName}` : `pccc_data_${projectName}`;
+    const key = `pccc_data_${userId}_${projectName}`;
     const savedData = localStorage.getItem(key);
     if (savedData) {
       const { info, chat } = JSON.parse(savedData);
@@ -70,7 +70,6 @@ export default function ConsultDashboard() {
     }
   };
 
-  // 3. AUTO-SAVE THEO USER ID
   useEffect(() => {
     if (!user) return;
     localStorage.setItem(`pccc_projects_${user.id}`, JSON.stringify(projects));

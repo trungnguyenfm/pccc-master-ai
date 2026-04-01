@@ -217,20 +217,7 @@
   color: #ffffff;
 }
 
-.btn-start-chat {
-  background-color: #3b82f6;
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.btn-start-chat:hover {
-  background-color: #2563eb;
-}
+/* .btn-start-chat was removed as it was redundant */
 
 /* THÊM MỚI: Bố cục chia đôi màn hình Form và Chat */
 .dashboard-split {

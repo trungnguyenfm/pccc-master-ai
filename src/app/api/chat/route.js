@@ -16,33 +16,23 @@ export async function POST(req) {
     const lastMessage = messages[messages.length - 1].content;
 
     // 1. Dùng mô hình Embedding để tính toán tọa độ vector câu hỏi
-    let query_embedding = null;
+    let contextText = '';
     try {
       const embeddingModel = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
-      const embeddingResult = await embeddingModel.embedContent(lastMessage);
-      query_embedding = embeddingResult.embedding.values;
-    } catch (embedError) {
-      console.warn("⚠️ API Nhúng Vector đã hết hạn mức (Quota 429). Hệ thống tự kích hoạt Chế độ Bypass RAG.");
-    }
-
-    // 2. Tra cứu cơ sở dữ liệu luật PCCC (Nếu có vector)
-    let documents = null;
-    if (query_embedding) {
-      const { data, error } = await supabase.rpc('match_pccc_documents', {
-        query_embedding,
-        match_threshold: 0.60, // Lấy các kết quả khá sát
+      const { embedding } = await embeddingModel.embedContent(lastMessage);
+      
+      const { data: documents, error } = await supabase.rpc('match_pccc_documents', {
+        query_embedding: embedding.values,
+        match_threshold: 0.60,
         match_count: 5
       });
-      if (error) {
-        console.error("Lỗi rút trích Supabase:", error);
-      } else {
-        documents = data;
-      }
-    }
 
-    let contextText = '';
-    if (documents && documents.length > 0) {
-      contextText = documents.map(doc => `[Trích tài liệu LUẬT: ${doc.metadata.source}]\n${doc.content}`).join('\n\n');
+      if (error) throw error;
+      if (documents?.length) {
+        contextText = documents.map(doc => `[Trích tài liệu LUẬT: ${doc.metadata.source}]\n${doc.content}`).join('\n\n');
+      }
+    } catch (err) {
+      console.warn("⚠️ RAG Bypass hoặc Lỗi DB:", err.message);
     }
 
     // 3. Kéo lịch sử chat về định dạng chuẩn của Google (Native)
