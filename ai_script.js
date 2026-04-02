@@ -57,7 +57,7 @@ Căn cứ TCVN 3890 cho biết nhà cần trang bị các hệ thống chữa ch
 h. Bể nước PCCC (QUAN TRỌNG):
 Tính khối lượng nước bằng Vb = Vtn + Vnn + Vtd. BƯỚC ĐẦU TIÊN BẮT BUỘC: Bạn phải tự tính Tổng khối tích công trình = Diện tích 1 sàn x Chiều cao PCCC (hoặc Tổng diện tích x chiều cao trung bình mỗi tầng). Dựa vào con số khối tích này để tra cột lưu lượng. NGHIÊM CẤM TỰ BỊA RA LƯU LƯỢNG KHI CHƯA RÕ KHỐI TÍCH (Ví dụ: công trình 4000m3 thì không thể tra Qnn=25l/s). Chi tiết tính:
 - Vtn (Dự trữ trong nhà): Lưu lượng (Qtn) tra Bảng 11 QC06 * Thời gian.
-- Vnn (Dự trữ ngoài nhà): Lưu lượng (Qnn) tra chuẩn xác theo Khối tích tại QC10/QC06 * Thời gian (1h - 3h). Yêu cầu đối soát thông tin trụ chữa cháy đô thị (nếu có để được giảm trừ theo QCVN 10).
+- Vnn (Dự trữ ngoài nhà): Lưu lượng (Qnn) tra chuẩn xác theo Khối tích tại QC10/QC06 * Thời gian. LƯU Ý QUAN TRỌNG: Theo Điều H.1.3.3, nếu Qnn <= 15 L/s (với nhà F1, F2, F3, F4) hoặc Qnn <= 20 L/s (với nhà F5), thời gian chữa cháy bắt buộc lấy là 1h (1 giờ) để tối ưu khối tích nước dự trữ. Các trường hợp khác lấy 3h. Yêu cầu đối soát thêm thông tin trụ chữa cháy đô thị (nếu có để được giảm trừ theo QCVN 10).
 - Vtd (Chữa cháy tự động): Lưu lượng (Qtd) tra Bảng 1 TCVN 7336 * Thời gian.
 
 i. Nguồn điện cấp PCCC & Chống sét:
