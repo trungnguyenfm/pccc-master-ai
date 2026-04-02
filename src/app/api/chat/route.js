@@ -54,7 +54,7 @@ export async function POST(req) {
 - Công năng / Tum / Hầm (có thể có hoặc ko): ${projectInfo?.logic || '(Chưa điền)'}
 
 --- QUY CHUẨN ĐƯỢC TRA CỨU TỪ HỆ THỐNG KIỂM TRA PCCC LÕI ---
-(AI chỉ dùng để tự tham khảo kết luận, TUYỆT ĐỐI không được Trích xuất nguồn nếu Người dùng chưa hối thúc):
+(AI BẮT BUỘC PHẢI DẪN CHỨNG: Ở cuối mỗi ý trả lời, hãy đính kèm cú pháp [Nguồn: "Tên tài liệu"] khớp với dữ liệu dưới đây):
 ${contextText || '(Không tìm thấy quy chuẩn liên kết mật thiết)' }
 `;
 

@@ -23,6 +23,7 @@ export default function ConsultDashboard() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
   const messagesEndRef = useRef(null);
 
   // 1. KIỂM TRA ĐĂNG NHẬP
@@ -101,7 +102,10 @@ export default function ConsultDashboard() {
   };
 
   const handleNewProject = () => {
-    if (!isPaidUser && projects.length >= 2) return;
+    if (!isPaidUser && projects.length >= 2) {
+      setShowPaywall(true);
+      return;
+    }
 
     const name = prompt("Nhập tên dự án mới:");
     if (name && name.trim()) {
@@ -148,6 +152,15 @@ export default function ConsultDashboard() {
   const removeFloor = (id) => {
     const currentFloors = projectInfo.floors || [];
     setProjectInfo({...projectInfo, floors: currentFloors.filter(f => f.id !== id)});
+  };
+
+  const duplicateFloor = (floor) => {
+    const currentFloors = projectInfo.floors || [];
+    const newFloor = { ...floor, id: Date.now(), title: `${floor.title} (Copy)` };
+    const index = currentFloors.findIndex(f => f.id === floor.id);
+    const newFloors = [...currentFloors];
+    newFloors.splice(index + 1, 0, newFloor);
+    setProjectInfo({...projectInfo, floors: newFloors});
   };
 
   const updateFloor = (id, field, value) => {
@@ -256,6 +269,10 @@ export default function ConsultDashboard() {
     }
   };
 
+  const handleExportPDF = () => {
+    window.print();
+  };
+
   if (!user) return <div style={{ backgroundColor: '#0d0d0d', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>Đang xác thực...</div>;
 
   return (
@@ -297,22 +314,52 @@ export default function ConsultDashboard() {
         <button 
           className="btn-new-project" 
           onClick={handleNewProject}
-          disabled={!isPaidUser && projects.length >= 2}
         >
-          {!isPaidUser && projects.length >= 2 ? "Hết lượt (Nâng Pro)" : "+ Dự án mới"}
+          {!isPaidUser && projects.length >= 2 ? "Hết lượt (Nâng cấp Pro)" : "+ Dự án mới"}
         </button>
         
         <p 
-          style={{ fontSize: '10px', color: '#333', cursor: 'pointer', marginTop: '10px' }}
-          onClick={() => {
-            const next = !isPaidUser;
-            setIsPaidUser(next);
-            localStorage.setItem(`pccc_tier_${user.id}`, next ? 'pro' : 'free');
-          }}
+          style={{ fontSize: '0.8rem', color: isPaidUser ? '#fbbf24' : '#a0a3ac', cursor: 'pointer', marginTop: '16px', textAlign: 'center', fontWeight: 'bold' }}
+          onClick={() => setShowPaywall(true)}
         >
-          {isPaidUser ? "[Gói PRO - Không giới hạn]" : "[Gói FREE - Click để lên PRO]"}
+          {isPaidUser ? "👑 Tài khoản PRO" : "⚡ Nâng cấp PRO để mở khóa"}
         </p>
       </aside>
+
+      {/* MODAL THANH TOÁN */}
+      {showPaywall && (
+        <div className="paywall-overlay" onClick={() => setShowPaywall(false)}>
+          <div className="paywall-modal" onClick={e => e.stopPropagation()}>
+            {isPaidUser ? (
+              <div style={{textAlign: 'center'}}>
+                <h2>Đã kích hoạt PRO!</h2>
+                <p>Cảm ơn sếp đã ủng hộ hệ thống.</p>
+                <button className="btn-apply-table" onClick={() => setShowPaywall(false)}>Đóng</button>
+              </div>
+            ) : (
+              <div style={{textAlign: 'center'}}>
+                <h2>Mở Khóa Toàn Bộ Quy Trình</h2>
+                <p style={{color: '#9ca3af', marginBottom: '24px'}}>Nâng cấp lên gói PRO để tạo không giới hạn Dự án và sử dụng tính năng Xuất Báo Cáo Tự Động.</p>
+                <div style={{background: '#fff', padding: '16px', display: 'inline-block', borderRadius: '12px', marginBottom: '24px'}}>
+                  {/* Mã QR tĩnh đại diện cho PayOS/Momo */}
+                  <img src="https://api.vietqr.io/image/970436-1011818168-hcdO0l9.jpg?accountName=LE%20TRUNG&amount=500000&addInfo=PCCC%20PRO" alt="QR Code" style={{width: '200px', height: '200px'}} />
+                </div>
+                <h3>Gói Chuyên Gia: 500,000đ / Tháng</h3>
+                <p style={{fontSize: '0.85rem', color: '#6b7280'}}>Hệ thống sẽ tự động mở khóa sau giao dịch thành công (Mô phỏng).</p>
+                <div style={{marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'center'}}>
+                  <button className="btn-remove-floor" onClick={() => setShowPaywall(false)} style={{padding: '12px 24px'}}>Để sau</button>
+                  <button className="btn-apply-table" onClick={() => {
+                    setIsPaidUser(true);
+                    localStorage.setItem(`pccc_tier_${user.id}`, 'pro');
+                    setShowPaywall(false);
+                    alert("Đã nhận thanh toán! Đang mở khóa PRO...");
+                  }}>Đã chuyển khoản</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <main className="main-content">
         <header className="main-header">
@@ -379,7 +426,7 @@ export default function ConsultDashboard() {
                     <th>Cao ($m$)</th>
                     <th>Khối Tích ($m^3$)</th>
                     <th>Người/Tầng</th>
-                    <th>Xóa</th>
+                    <th>Thao Tác</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -395,8 +442,9 @@ export default function ConsultDashboard() {
                         <td><input type="number" step="0.1" value={f.height} onChange={e => updateFloor(f.id, 'height', e.target.value)} placeholder="0.0" /></td>
                         <td style={{fontWeight: 'bold', textAlign:'right', color: '#ff7733'}}>{vol > 0 ? vol.toFixed(1) : '-'}</td>
                         <td><input type="number" value={f.headCount} onChange={e => updateFloor(f.id, 'headCount', e.target.value)} placeholder="50" /></td>
-                        <td style={{textAlign:'center'}}>
-                          {currentFloors.length > 1 && <button onClick={() => removeFloor(f.id)} className="btn-remove-floor">X</button>}
+                        <td style={{textAlign:'center', whiteSpace: 'nowrap'}}>
+                          <button onClick={() => duplicateFloor(f)} className="btn-duplicate-floor" style={{marginRight: '8px'}} title="Nhân bản tầng này">📄</button>
+                          {currentFloors.length > 1 && <button onClick={() => removeFloor(f.id)} className="btn-remove-floor" title="Xóa">X</button>}
                         </td>
                       </tr>
                     );
@@ -426,7 +474,14 @@ export default function ConsultDashboard() {
           </section>
 
           <section className="chat-section split-right">
-            <h3 className="form-title">Chuyên Gia AI Thẩm Duyệt</h3>
+            <h3 className="form-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Chuyên Gia AI Thẩm Duyệt</span>
+              {isPaidUser ? (
+                 <button onClick={handleExportPDF} className="btn-duplicate-floor" style={{fontSize: '0.85rem'}}>🖨️ In Báo Cáo PDF</button>
+              ) : (
+                 <button onClick={() => setShowPaywall(true)} className="btn-duplicate-floor" style={{fontSize: '0.85rem', color: '#fbbf24', background: 'rgba(251, 191, 36, 0.1)'}}>👑 Gói Pro: Xuất PDF</button>
+              )}
+            </h3>
             <div className="chat-history">
               {messages.length === 0 && (
                 <div className="chat-welcome">
