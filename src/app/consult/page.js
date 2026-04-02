@@ -180,8 +180,8 @@ export default function ConsultDashboard() {
     promptStr += `- Chiều cao lan can tầng trên cùng: ${projectInfo.railingHeight || 0} m\n`;
     promptStr += `- Diện tích Tầng Tum: ${projectInfo.tumArea || 0} m2\n\n`;
 
-    promptStr += `**TỔNG CỘNG KHỐI TÍCH & DIỆN TÍCH**: \n- Tổng diện tích: ${totalFloorArea} m2\n- Tổng chiều cao: ${totalFloorHeight.toFixed(2)} m\n- KHỐI TÍCH NHÀ LÀ: ${totalVolume.toFixed(2)} m3.\n\n`;
-    promptStr += `Dựa vào Bảng số liệu và Ghi chú đặc thù trên, hãy NHANH CHÓNG kiểm tra lại quy mô công trình. Yêu cầu: \n1. Liệt kê NGẮN GỌN từng tầng cần cụ thể mấy Lối thoát nạn.\n2. Tính chuẩn xác lượng nước Vnn.\n3. Kết luận về Chiều cao PCCC bị ảnh hưởng thế nào bởi Tum và Lan can.\n(GHI CHÚ QUAN TRỌNG: Trình bày siêu ngắn gọn từng gạch đầu dòng, GHI THẲNG KẾT QUẢ, bỏ qua diễn giải dông dài, tuyệt đối không bịa số liệu!)`;
+    promptStr += `**TỔNG CỘNG KHỐI TÍCH & KÍCH THƯỚC**: \n- Tổng diện tích các sàn: ${totalFloorArea} m2\n- Chiều cao xây dựng cộng dồn các tầng: ${totalFloorHeight.toFixed(2)} m\n- 🔴 CHIỀU CAO PCCC CHÍNH THỨC CỦA NHÀ (Từ mặt đường chữa cháy đến mặt sàn tầng trên cùng/lan can): ${projectInfo.height || 0} m\n- KHỐI TÍCH BÊN TRONG CỦA NHÀ LÀ: ${totalVolume.toFixed(2)} m3.\n\n`;
+    promptStr += `Dựa vào Bảng số liệu trên, hãy LẬP TỨC kiểm tra lại quy mô công trình. Yêu cầu: \n1. Ghi chú rõ sự khác nhau giữa Chiều cao xây dựng và Chiều cao PCCC đối với tòa nhà này.\n2. Liệt kê NGẮN GỌN từng tầng cần cụ thể mấy Lối thoát nạn.\n3. Tính chuẩn xác lượng nước Vnn.\n4. Kết luận về Chiều cao PCCC bị ảnh hưởng thế nào bởi Tum và Lan can.\n(GHI CHÚ QUAN TRỌNG: Trình bày siêu ngắn gọn từng gạch đầu dòng, GHI THẲNG KẾT QUẢ, tuyệt đối KHÔNG ĐƯỢC lấy Chiều cao cộng dồn làm Chiều cao PCCC!)`;
     
     const userMsg = { role: 'user', content: promptStr };
     setMessages(prev => [...prev, userMsg]);
