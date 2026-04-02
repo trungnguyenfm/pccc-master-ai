@@ -180,8 +180,8 @@ export default function ConsultDashboard() {
     promptStr += `- Chiều cao lan can tầng trên cùng: ${projectInfo.railingHeight || 0} m\n`;
     promptStr += `- Diện tích Tầng Tum: ${projectInfo.tumArea || 0} m2\n\n`;
 
-    promptStr += `**TỔNG CỘNG KHỐI TÍCH & KÍCH THƯỚC**: \n- Tổng diện tích các sàn: ${totalFloorArea} m2\n- Chiều cao xây dựng cộng dồn các tầng: ${totalFloorHeight.toFixed(2)} m\n- 🔴 CHIỀU CAO PCCC CHÍNH THỨC CỦA NHÀ (Từ mặt đường chữa cháy đến mặt sàn tầng trên cùng/lan can): ${projectInfo.height || 0} m\n- KHỐI TÍCH BÊN TRONG CỦA NHÀ LÀ: ${totalVolume.toFixed(2)} m3.\n\n`;
-    promptStr += `Dựa vào Bảng số liệu trên, hãy LẬP TỨC kiểm tra lại quy mô công trình. Yêu cầu: \n1. Ghi chú rõ sự khác nhau giữa Chiều cao xây dựng và Chiều cao PCCC đối với tòa nhà này.\n2. Liệt kê NGẮN GỌN từng tầng cần cụ thể mấy Lối thoát nạn.\n3. Tính chuẩn xác lượng nước Vnn.\n4. Kết luận về Chiều cao PCCC bị ảnh hưởng thế nào bởi Tum và Lan can.\n(GHI CHÚ QUAN TRỌNG: Trình bày siêu ngắn gọn từng gạch đầu dòng, GHI THẲNG KẾT QUẢ, tuyệt đối KHÔNG ĐƯỢC lấy Chiều cao cộng dồn làm Chiều cao PCCC!)`;
+    promptStr += `**TỔNG CỘNG KHỐI TÍCH & KÍCH THƯỚC**: \n- Tổng diện tích các sàn (Trong bảng tra): ${totalFloorArea} m2\n- Chiều cao xây dựng cộng dồn các tầng: ${totalFloorHeight.toFixed(2)} m\n- KHỐI TÍCH BÊN TRONG CỦA NHÀ LÀ: ${totalVolume.toFixed(2)} m3.\n\n`;
+    promptStr += `Dựa vào Bảng số liệu trên, hãy LẬP TỨC tính toán lại quy mô công trình. Yêu cầu BẮT BUỘC: \n1. Bạn hãy KIỂM TRA BẢNG VÀ TỰ TÍNH: "Chiều cao PCCC" đích thực của công trình bằng bao nhiêu mét? (Hướng dẫn AI: Lấy tổng chiều cao xây dựng TRỪ ĐI tổng chiều cao các tầng hầm, và xét xem Tum có <= 30% sàn dưới không để loại trừ Tum. Nhớ xem xét lan can theo QCVN 06).\n2. Liệt kê NGẮN GỌN từng tầng cần cụ thể mấy Lối thoát nạn.\n3. Tính chuẩn xác lượng nước Vnn.\n4. Kết luận về Chiều cao PCCC này.\n(GHI CHÚ QUAN TRỌNG: Trình bày siêu ngắn gọn từng gạch đầu dòng, GHI THẲNG KẾT QUẢ, tuyệt đối KHÔNG ĐƯỢC lấy Chiều cao cộng dồn làm Chiều cao PCCC!)`;
     
     const userMsg = { role: 'user', content: promptStr };
     setMessages(prev => [...prev, userMsg]);
@@ -335,22 +335,14 @@ export default function ConsultDashboard() {
                 </select>
               </div>
               <div className="form-group">
-                <label>Diện tích sàn (m²)</label>
-                <input type="text" value={projectInfo.area} placeholder="500" onChange={(e)=>setProjectInfo({...projectInfo, area: e.target.value})}/>
-              </div>
-              <div className="form-group">
                 <label>Bậc chịu lửa</label>
                 <select value={projectInfo.fireResistance} onChange={(e)=>setProjectInfo({...projectInfo, fireResistance: e.target.value})}>
                   <option value="I">I</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option><option value="V">V</option>
                 </select>
               </div>
               <div className="form-group">
-                <label>Tổng diện tích</label>
+                <label>Tổng diện tích khu đất/Công trình</label>
                 <input type="text" value={projectInfo.totalArea} placeholder="1.2ha" onChange={(e)=>setProjectInfo({...projectInfo, totalArea: e.target.value})}/>
-              </div>
-              <div className="form-group">
-                <label>Chiều cao PCCC (m)</label>
-                <input type="text" value={projectInfo.height} placeholder="45.5" onChange={(e)=>setProjectInfo({...projectInfo, height: e.target.value})}/>
               </div>
               <div className="form-group">
                 <label>Hầm âm sâu (m)</label>
