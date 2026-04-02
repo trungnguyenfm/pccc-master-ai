@@ -605,3 +605,74 @@
     border-color: #3b82f6;
   }
 }
+
+/* THÊM MỚI: CSS Citation Markers & Popups */
+.citation-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  font-size: 10px;
+  font-weight: 700;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  margin: 0 2px;
+  cursor: pointer;
+  vertical-align: super;
+  transition: all 0.2s;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+.citation-marker:hover {
+  background-color: #3b82f6;
+  color: white;
+  transform: scale(1.2);
+}
+
+.citation-popup {
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 20px;
+  width: 90%;
+  max-width: 450px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+  color: #e5e7eb;
+  animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.citation-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: #60a5fa;
+}
+
+.citation-popup-header button {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 1.2rem;
+}
+
+.citation-popup-content {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  max-height: 300px;
+  overflow-y: auto;
+  color: #d1d5db;
+  white-space: pre-wrap;
+}
+
+.citation-popup-content::-webkit-scrollbar {
+  width: 4px;
+}
+.citation-popup-content::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}

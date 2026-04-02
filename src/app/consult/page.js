@@ -24,6 +24,8 @@ export default function ConsultDashboard() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [activeSources, setActiveSources] = useState({}); // { messageIndex: [sources] }
+  const [citationPopup, setCitationPopup] = useState(null); // { id: number, title: string, content: string }
   const messagesEndRef = useRef(null);
 
   // 1. KIỂM TRA ĐĂNG NHẬP
@@ -210,14 +212,29 @@ export default function ConsultDashboard() {
         const decoder = new TextDecoder('utf-8');
         setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
+        let fullText = '';
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
+          fullText += chunk;
+
+          // XỬ LÝ GIAO THỨC TÁCH NGUỒN (SOURCES)
+          if (fullText.includes('SOURCES_DATA:') && fullText.includes('@END_SOURCES@')) {
+             const parts = fullText.split('@END_SOURCES@');
+             const sourceHeader = parts[0].replace('SOURCES_DATA:', '');
+             try {
+                const sources = JSON.parse(sourceHeader);
+                const assistantMsgIdx = messages.length + 1;
+                setActiveSources(prev => ({ ...prev, [assistantMsgIdx]: sources }));
+             } catch(e) {}
+             fullText = parts[1]; // Chỉ giữ lại phần nội dung chat
+          }
+
           setMessages(prev => {
             const newArray = [...prev];
             const lastMsg = newArray[newArray.length - 1];
-            lastMsg.content += chunk;
+            lastMsg.content = fullText;
             return newArray;
           });
         }
@@ -250,14 +267,28 @@ export default function ConsultDashboard() {
       const decoder = new TextDecoder('utf-8');
       setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
+      let fullText = '';
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });
+        fullText += chunk;
+
+        if (fullText.includes('SOURCES_DATA:') && fullText.includes('@END_SOURCES@')) {
+           const parts = fullText.split('@END_SOURCES@');
+           const sourceHeader = parts[0].replace('SOURCES_DATA:', '');
+           try {
+              const sources = JSON.parse(sourceHeader);
+              const assistantMsgIdx = messages.length + 1;
+              setActiveSources(prev => ({ ...prev, [assistantMsgIdx]: sources }));
+           } catch(e) {}
+           fullText = parts[1];
+        }
+
         setMessages(prev => {
           const newArray = [...prev];
           const lastMsg = newArray[newArray.length - 1];
-          lastMsg.content += chunk;
+          lastMsg.content = fullText;
           return newArray;
         });
       }
@@ -271,6 +302,31 @@ export default function ConsultDashboard() {
 
   const handleExportPDF = () => {
     window.print();
+  };
+
+  const renderMessageContent = (msg, msgIdx) => {
+    if (msg.role === 'user') return msg.content;
+    
+    const sources = activeSources[msgIdx] || [];
+    const parts = msg.content.split(/(\[\^\d+\])/g);
+    
+    return parts.map((part, i) => {
+      const match = part.match(/\[\^(\d+)\]/);
+      if (match) {
+        const sourceId = parseInt(match[1]);
+        const sourceData = sources.find(s => s.id === sourceId);
+        return (
+          <sup 
+            key={i} 
+            className="citation-marker" 
+            onClick={() => setCitationPopup(sourceData)}
+          >
+            [{sourceId}]
+          </sup>
+        );
+      }
+      return part;
+    });
   };
 
   if (!user) return <div style={{ backgroundColor: '#0d0d0d', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>Đang xác thực...</div>;
@@ -358,6 +414,24 @@ export default function ConsultDashboard() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* POPUP TRÍCH DẪN (NotebookLM Style) */}
+      {citationPopup && (
+        <div className="paywall-overlay" onClick={() => setCitationPopup(null)} style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'none' }}>
+           <div className="citation-popup" onClick={e => e.stopPropagation()}>
+              <div className="citation-popup-header">
+                 <span>📖 Nguồn: {citationPopup.title}</span>
+                 <button onClick={() => setCitationPopup(null)}>✕</button>
+              </div>
+              <div className="citation-popup-content">
+                 {citationPopup.content}
+              </div>
+              <div style={{ marginTop: '12px', fontSize: '11px', color: '#666', borderTop: '1px solid #333', paddingTop: '8px' }}>
+                 *Đoạn trích dẫn này được lấy trực tiếp từ thư viện luật PCCC của hệ thống.
+              </div>
+           </div>
         </div>
       )}
 
@@ -497,7 +571,7 @@ export default function ConsultDashboard() {
               )}
               {messages.map((m, idx) => (
                 <div key={idx} className={`chat-message ${m.role}`}>
-                  <div className="message-bubble">{m.content}</div>
+                  <div className="message-bubble">{renderMessageContent(m, idx)}</div>
                 </div>
               ))}
               {isLoading && <div className="chat-message assistant"><div className="message-bubble loading">Đang suy nghĩ ...</div></div>}

@@ -41,25 +41,54 @@ export async function POST(req) {
       parts: [{ text: m.content || '' }]
     }));
 
-    // 4. Nhồi Dữ liệu PCCC vào System Prompt
-    const systemInstruction = `${AI_SCRIPT.system_role}
+    // Tạo danh sách nguồn có đánh số để gửi về Frontend
+    let sourceMap = [];
+    let formattedContext = "KHÔNG TÌM THẤY TÀI LIỆU LIÊN QUAN.";
+    
+    try {
+      const embeddingModel = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
+      const { embedding } = await embeddingModel.embedContent(lastMessage);
+      
+      const { data: documents, error } = await supabase.rpc('match_pccc_documents', {
+        query_embedding: embedding.values,
+        match_threshold: 0.55,
+        match_count: 5
+      });
 
---- THÔNG SỐ ĐẦU VÀO ĐÃ CÓ (Tự động thu thập từ Form bên trái màn hình) ---
-(AI hãy dựa vào đây để không hỏi lại những câu đã có số liệu):
-- Quy mô: ${projectInfo?.scale || '(Chưa điền)'}
-- Hạng sản xuất: ${projectInfo?.tier || '(Chưa điền)'}
-- Diện tích sàn/Tổng diện tích: ${projectInfo?.area || '(Chưa điền)'} / ${projectInfo?.totalArea || '(Chưa điền)'}
-- Bậc chịu lửa: ${projectInfo?.fireResistance || '(Chưa điền)'}
-- Chiều cao PCCC: ${projectInfo?.height || '(Chưa điền)'}
-- Công năng / Tum / Hầm (có thể có hoặc ko): ${projectInfo?.logic || '(Chưa điền)'}
+      if (!error && documents?.length) {
+        sourceMap = documents.map((doc, idx) => ({
+          id: idx + 1,
+          title: doc.metadata.source,
+          content: doc.content
+        }));
+        formattedContext = sourceMap.map(s => `[Tài liệu ${s.id}: ${s.title}]\n${s.content}`).join('\n\n');
+      }
+    } catch (err) {
+      console.warn("RAG Error:", err.message);
+    }
 
---- QUY CHUẨN ĐƯỢC TRA CỨU TỪ HỆ THỐNG KIỂM TRA PCCC LÕI ---
-(AI BẮT BUỘC PHẢI DẪN CHỨNG: Ở cuối mỗi ý trả lời, hãy đính kèm cú pháp [Nguồn: "Tên tài liệu"] khớp với dữ liệu dưới đây):
-${contextText || '(Không tìm thấy quy chuẩn liên kết mật thiết)' }
+    // 4. Nhồi Dữ liệu PCCC vào System Prompt (DỌN DẸP TRIỆT ĐỂ LẶP LỜI)
+    const systemInstruction = `Bạn là Chuyên gia PCCC cao cấp.
+QUY TẮC PHẢN HỒI:
+1. TUYỆT ĐỐI KHÔNG lặp lại câu chào, không lặp lại yêu cầu của người dùng. 
+2. Đi thẳng vào nội dung tư vấn theo cấu trúc gạch đầu dòng [1., 2., 3.].
+3. NẾU TRẢ LỜI DỰA TRÊN TÀI LIỆU, bạn BẮT BUỘC phải chèn ký hiệu trích dẫn dạng [^ID] (Ví dụ: [^1], [^2]) vào cuối câu/đoạn trích dẫn. KHÔNG dùng định dạng khác.
+4. Trình bày siêu ngắn gọn, ưu tiên con số và kết luận kỹ thuật.
+
+THÔNG SỐ CÔNG TRÌNH:
+- Quy mô: ${projectInfo?.scale || 'N/A'}
+- Hạng/Bậc: ${projectInfo?.tier || 'A'} / ${projectInfo?.fireResistance || 'I'}
+- Diện tích: ${projectInfo?.totalArea || 'N/A'}
+- Chiều cao PCCC: AI TỰ TÍNH TOÁN DỰA TRÊN BẢNG (Tổng - Hầm - Tum).
+
+DỮ LIỆU PHÁP LÝ (Hãy dùng các ID này để trích dẫn [^ID]):
+${formattedContext}
+
+${AI_SCRIPT.system_role.split('QUY TẮC ĐỌC LUẬT BẮT BUỘC:')[1] || ''}
 `;
 
     const chatModel = genAI.getGenerativeModel({ 
-      model: 'gemini-2.5-flash',
+      model: 'gemini-1.5-flash',
       systemInstruction
     });
 
@@ -68,16 +97,20 @@ ${contextText || '(Không tìm thấy quy chuẩn liên kết mật thiết)' }
     // 5. Mở Cổng truyền dữ liệu trực tiếp (Streaming)
     const streamResult = await chat.sendMessageStream(lastMessage);
 
-    // Ép luồng dữ liệu về tương thích hoàn hảo với giao diện @ai-sdk/react (Định dạng Vercel Stream Data 0:"chữ")
     const stream = new ReadableStream({
       async start(controller) {
         try {
+          // GỬI DANH SÁCH NGUỒN TRƯỚC (Protocol đặc biệt)
+          if (sourceMap.length > 0) {
+            const sourcesHeader = `SOURCES_DATA:${JSON.stringify(sourceMap)}@END_SOURCES@`;
+            controller.enqueue(new TextEncoder().encode(sourcesHeader));
+          }
+
           for await (const chunk of streamResult.stream) {
             controller.enqueue(new TextEncoder().encode(chunk.text()));
           }
-          // Chèn chữ ký "Đóng gói" cuối cùng từ biến kịch bản
           if (AI_SCRIPT.signature) {
-            controller.enqueue(new TextEncoder().encode(AI_SCRIPT.signature));
+            controller.enqueue(new TextEncoder().encode('\n' + AI_SCRIPT.signature));
           }
           controller.close();
         } catch (err) {
@@ -95,7 +128,7 @@ ${contextText || '(Không tìm thấy quy chuẩn liên kết mật thiết)' }
     });
 
   } catch (error) {
-    console.error('Lỗi nghiêm trọng Server AI:', error);
-    return new Response(JSON.stringify({ error: 'Nguồn đứt gãy kết nối: ' + error.message }), { status: 500 });
+    console.error('SERVER AI ERROR:', error);
+    return new Response(JSON.stringify({ error: 'Lỗi AI: ' + error.message }), { status: 500 });
   }
 }
