@@ -28,6 +28,55 @@ export default function ConsultDashboard() {
   const [citationPopup, setCitationPopup] = useState(null); // { id: number, title: string, content: string }
   const messagesEndRef = useRef(null);
 
+  // --- HỆ THỐNG RESIZABLE PANELS ---
+  const [sidebarWidth, setSidebarWidth] = useState(250);
+  const [splitWidth, setSplitWidth] = useState(500);
+  const [chatInputHeight, setChatInputHeight] = useState(80);
+  const resizerRef = useRef(null);
+  const splitResizerRef = useRef(null);
+
+  const startResizingSidebar = (e) => {
+    const handleMouseMove = (moveEvent) => {
+      setSidebarWidth(Math.max(180, Math.min(500, moveEvent.clientX)));
+    };
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const startResizingSplit = (e) => {
+    const startX = e.clientX;
+    const startWidth = splitWidth;
+    const handleMouseMove = (moveEvent) => {
+      const delta = moveEvent.clientX - startX;
+      setSplitWidth(Math.max(300, Math.min(1000, startWidth + delta)));
+    };
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const startResizingInput = (e) => {
+    const startY = e.clientY;
+    const startHeight = chatInputHeight;
+    const handleMouseMove = (moveEvent) => {
+      const delta = startY - moveEvent.clientY;
+      setChatInputHeight(Math.max(60, Math.min(400, startHeight + delta)));
+    };
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
   // 1. KIỂM TRA ĐĂNG NHẬP
   useEffect(() => {
     const checkUser = async () => {
@@ -147,7 +196,18 @@ export default function ConsultDashboard() {
   // Các hàm tiện ích bảng lưới tầng
   const addFloor = () => {
     const currentFloors = projectInfo.floors || [];
-    const newFloor = { id: Date.now(), title: `Tầng ${currentFloors.length + 1}`, fireGroup: '', function: '', area: '', height: '', headCount: '', escapeRoutes: '' };
+    const lastFloor = currentFloors[currentFloors.length - 1];
+    let newTitle = `Tầng ${currentFloors.length + 1}`;
+    
+    // Nếu tầng cuối có dạng số, hãy cố gắng cộng 1
+    if (lastFloor && lastFloor.title) {
+        const match = lastFloor.title.match(/(.*?)(\d+)$/);
+        if (match) {
+            newTitle = `${match[1]}${parseInt(match[2]) + 1}`;
+        }
+    }
+
+    const newFloor = { id: Date.now(), title: newTitle, fireGroup: lastFloor?.fireGroup || '', function: '', area: '', height: lastFloor?.height || '', headCount: '', escapeRoutes: '' };
     setProjectInfo({...projectInfo, floors: [...currentFloors, newFloor]});
   };
 
@@ -158,7 +218,17 @@ export default function ConsultDashboard() {
 
   const duplicateFloor = (floor) => {
     const currentFloors = projectInfo.floors || [];
-    const newFloor = { ...floor, id: Date.now(), title: `${floor.title} (Copy)` };
+    
+    // Logic Smart Title: Tầng 1 -> Tầng 2
+    let newTitle = floor.title;
+    const match = floor.title.match(/(.*?)(\d+)$/);
+    if (match) {
+        newTitle = `${match[1]}${parseInt(match[2]) + 1}`;
+    } else {
+        newTitle = `${floor.title} (Copy)`;
+    }
+
+    const newFloor = { ...floor, id: Date.now(), title: newTitle };
     const index = currentFloors.findIndex(f => f.id === floor.id);
     const newFloors = [...currentFloors];
     newFloors.splice(index + 1, 0, newFloor);
@@ -292,7 +362,8 @@ export default function ConsultDashboard() {
 
   return (
     <div className="dashboard-container">
-      <aside className="sidebar">
+      <aside className="sidebar" style={{ width: `${sidebarWidth}px` }}>
+        <div className="sidebar-resizer" onMouseDown={startResizingSidebar} />
         <div className="user-profile" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px' }}>
           <img src={user.user_metadata.avatar_url} alt="Avatar" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
           <div style={{ overflow: 'hidden' }}>
@@ -400,8 +471,9 @@ export default function ConsultDashboard() {
           <button className="btn-fullscreen">Fullscreen</button>
         </header>
 
-        <div className="dashboard-split">
-          <section className="form-section split-left">
+        <div className="dashboard-split" style={{ paddingLeft: '16px' }}>
+          <section className="form-section split-left" style={{ width: `${splitWidth}px`, maxWidth: 'none', flex: 'none' }}>
+            <div className="main-split-resizer" onMouseDown={startResizingSplit} />
             <h3 className="form-title">Thông số Công Trình</h3>
             <div className="form-grid">
               <div className="form-group">
@@ -537,12 +609,20 @@ export default function ConsultDashboard() {
               <div ref={messagesEndRef} />
             </div>
 
-            <form onSubmit={handleSubmit} className="chat-input-area">
-              <input 
+            <form onSubmit={handleSubmit} className="chat-input-area" style={{ height: `${chatInputHeight}px`, position: 'relative' }}>
+              <div className="chat-input-resizer" onMouseDown={startResizingInput} />
+              <textarea 
                 className="chat-input"
+                style={{ borderRadius: '12px', resize: 'none' }}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Nhập câu hỏi tại đây..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit(e);
+                  }
+                }}
+                placeholder="Nhập câu hỏi tại đây... (Shift+Enter để xuống dòng)"
                 disabled={isLoading}
               />
               <button className="chat-send-btn" type="submit" disabled={isLoading || !input.trim()}>Hỏi</button>
