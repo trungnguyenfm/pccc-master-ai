@@ -16,20 +16,35 @@ const embeddingModel = genAI.getGenerativeModel({ model: "gemini-embedding-001" 
 
 const DOCS_DIR = 'd:\\tai-lieu-pccc'; // Bạn nhớ tạo thư mục này ở ổ D nhé!
 
-// Hàm phân mảnh văn bản nhỏ lại
-function getChunks(text, maxChars = 1000) {
+// Hàm phân mảnh văn bản nhỏ lại (Có sử dụng kỹ thuật gối đầu - Overlap để không mất ngữ cảnh)
+function getChunks(text, maxChars = 2000, overlapChars = 400) {
   const words = text.split(/\s+/);
   const chunks = [];
-  let currentChunk = '';
-  for (const word of words) {
-    if ((currentChunk + ' ' + word).length > maxChars) {
-      if (currentChunk.trim().length > 0) chunks.push(currentChunk.trim());
-      currentChunk = word;
-    } else {
-      currentChunk += (currentChunk ? ' ' : '') + word;
+  let i = 0;
+  
+  while (i < words.length) {
+    let currentChunk = '';
+    let startIdx = i;
+    
+    // Gom từ vào đoạn cho tới khi chạm mốc maxChars
+    while (i < words.length && (currentChunk + ' ' + words[i]).length <= maxChars) {
+      currentChunk += (currentChunk ? ' ' : '') + words[i];
+      i++;
+    }
+    
+    if (currentChunk.trim().length > 0) chunks.push(currentChunk.trim());
+    
+    // Lùi lại một chút (overlap) để câu sau luôn nối tiếp ý câu trước
+    if (i < words.length) {
+      let overlapLen = 0;
+      let stepBack = 1;
+      while ((i - stepBack) >= startIdx && overlapLen < overlapChars) {
+        overlapLen += words[i - stepBack].length + 1;
+        stepBack++;
+      }
+      i = i - stepBack + 1;
     }
   }
-  if (currentChunk.trim().length > 0) chunks.push(currentChunk.trim());
   return chunks;
 }
 
