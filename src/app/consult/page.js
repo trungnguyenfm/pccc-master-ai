@@ -15,7 +15,8 @@ export default function ConsultDashboard() {
   const [isPaidUser, setIsPaidUser] = useState(false);
   
   const [projectInfo, setProjectInfo] = useState({
-    scale: '', tier: 'A', area: '', fireResistance: 'I', totalArea: '', location: '', height: '', logic: ''
+    scale: '', tier: 'A', area: '', fireResistance: 'I', totalArea: '', location: '', height: '', logic: '',
+    floors: [{ id: Date.now(), title: 'Tầng 1', fireGroup: 'F3.5', function: 'Kinh doanh dịch vụ', area: '110', height: '4.4', headCount: '', escapeRoutes: '' }]
   });
 
   const [messages, setMessages] = useState([]);
@@ -60,12 +61,16 @@ export default function ConsultDashboard() {
   const loadProjectData = (projectName, userId) => {
     const key = `pccc_data_${userId}_${projectName}`;
     const savedData = localStorage.getItem(key);
+    const defaultData = { 
+      scale: '', tier: 'A', area: '', fireResistance: 'I', totalArea: '', location: '', height: '', logic: '',
+      floors: [{ id: Date.now(), title: 'Tầng 1', fireGroup: 'F3.5', function: 'VD: Văn phòng', area: '', height: '', headCount: '', escapeRoutes: '' }]
+    };
     if (savedData) {
       const { info, chat } = JSON.parse(savedData);
-      setProjectInfo(info || { scale: '', tier: 'A', area: '', fireResistance: 'I', totalArea: '', location: '', height: '', logic: '' });
+      setProjectInfo({ ...defaultData, ...info });
       setMessages(chat || []);
     } else {
-      setProjectInfo({ scale: '', tier: 'A', area: '', fireResistance: 'I', totalArea: '', location: '', height: '', logic: '' });
+      setProjectInfo(defaultData);
       setMessages([]);
     }
   };
@@ -130,6 +135,79 @@ export default function ConsultDashboard() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
   useEffect(() => scrollToBottom(), [messages]);
+
+  // Các hàm tiện ích bảng lưới tầng
+  const addFloor = () => {
+    const currentFloors = projectInfo.floors || [];
+    const newFloor = { id: Date.now(), title: `Tầng ${currentFloors.length + 1}`, fireGroup: '', function: '', area: '', height: '', headCount: '', escapeRoutes: '' };
+    setProjectInfo({...projectInfo, floors: [...currentFloors, newFloor]});
+  };
+
+  const removeFloor = (id) => {
+    const currentFloors = projectInfo.floors || [];
+    setProjectInfo({...projectInfo, floors: currentFloors.filter(f => f.id !== id)});
+  };
+
+  const updateFloor = (id, field, value) => {
+    const updatedFloors = (projectInfo.floors || []).map(f => {
+      if (f.id === id) return { ...f, [field]: value };
+      return f;
+    });
+    setProjectInfo({...projectInfo, floors: updatedFloors});
+  };
+
+  const currentFloors = projectInfo.floors || [];
+  const totalFloorArea = currentFloors.reduce((sum, f) => sum + (parseFloat(f.area) || 0), 0);
+  const totalFloorHeight = currentFloors.reduce((sum, f) => sum + (parseFloat(f.height) || 0), 0);
+  const totalVolume = currentFloors.reduce((sum, f) => sum + ((parseFloat(f.area) || 0) * (parseFloat(f.height) || 0)), 0);
+
+  const handleApplyToAI = () => {
+    if (isLoading) return;
+    
+    let promptStr = `Dưới đây là BẢNG THÔNG SỐ CHI TIẾT TỪNG TẦNG do tôi tự định nghĩa:\n\n`;
+    promptStr += `| STT | Tầng | Nhóm cháy | Công năng | Diện tích | Chiều cao | Khối tích | Số người |\n`;
+    promptStr += `|---|---|---|---|---|---|---|---|\n`;
+    
+    currentFloors.forEach((f, i) => {
+      const vol = (parseFloat(f.area) || 0) * (parseFloat(f.height) || 0);
+      promptStr += `| ${i+1} | ${f.title || '-'} | ${f.fireGroup || '-'} | ${f.function || '-'} | ${f.area || 0} m2 | ${f.height || 0} m | ${vol.toFixed(2)} m3 | ${f.headCount || '-'} |\n`;
+    });
+    
+    promptStr += `\n**TỔNG CỘNG KHỐI TÍCH & DIỆN TÍCH**: \n- Tổng diện tích: ${totalFloorArea} m2\n- Tổng chiều cao: ${totalFloorHeight.toFixed(2)} m\n- KHỐI TÍCH NHÀ LÀ: ${totalVolume.toFixed(2)} m3.\n\n`;
+    promptStr += `Bạn hãy ĐỌC KỸ dữ liệu Bảng trên, từ đó: \n1. Tự động nội suy lại quy mô, khối tích chuẩn.\n2. Tư vấn CỤ THỂ từng tầng cần bao nhiêu Lối thoát nạn.\n3. Tính lại cho tôi lượng nước Vnn dựa TRÊN khối lượng thực tế này.\nKHÔNG ĐƯỢC BỊA RA THÔNG SỐ!`;
+    
+    const userMsg = { role: 'user', content: promptStr };
+    setMessages(prev => [...prev, userMsg]);
+    setIsLoading(true);
+    
+    fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [...messages, userMsg], projectInfo })
+    }).then(async (response) => {
+        if (!response.ok) throw new Error(await response.text());
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          setMessages(prev => {
+            const newArray = [...prev];
+            const lastMsg = newArray[newArray.length - 1];
+            lastMsg.content += chunk;
+            return newArray;
+          });
+        }
+    }).catch(err => {
+        console.error(err);
+        setMessages(prev => [...prev, { role: 'assistant', content: '❌ Trục trặc hệ thống gửi bảng' }]);
+    }).finally(() => {
+        setIsLoading(false);
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -269,8 +347,70 @@ export default function ConsultDashboard() {
               </div>
               <div className="form-group full-width">
                 <label>Công năng / Tum / Hầm</label>
-                <textarea rows={3} value={projectInfo.logic} placeholder="..." onChange={(e)=>setProjectInfo({...projectInfo, logic: e.target.value})}></textarea>
+                <textarea rows={2} value={projectInfo.logic} placeholder="..." onChange={(e)=>setProjectInfo({...projectInfo, logic: e.target.value})}></textarea>
               </div>
+            </div>
+
+            <h3 className="form-title" style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Bảng Chi Tiết Từng Tầng</span>
+              <button onClick={addFloor} className="btn-add-floor">+ Thêm Tầng</button>
+            </h3>
+            
+            <div className="table-responsive">
+              <table className="floor-table">
+                <thead>
+                  <tr>
+                    <th>STT</th>
+                    <th>Tầng Xây</th>
+                    <th>Nhóm D.Hiểm</th>
+                    <th>Công Năng</th>
+                    <th>DT ($m^2$)</th>
+                    <th>Cao ($m$)</th>
+                    <th>Khối Tích ($m^3$)</th>
+                    <th>Người/Tầng</th>
+                    <th>Xóa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentFloors.map((f, i) => {
+                    const vol = (parseFloat(f.area) || 0) * (parseFloat(f.height) || 0);
+                    return (
+                      <tr key={f.id}>
+                        <td style={{textAlign:'center'}}>{i+1}</td>
+                        <td><input type="text" value={f.title} onChange={e => updateFloor(f.id, 'title', e.target.value)} placeholder="Tầng 1" /></td>
+                        <td><input type="text" value={f.fireGroup} onChange={e => updateFloor(f.id, 'fireGroup', e.target.value)} placeholder="F3.5" /></td>
+                        <td><input type="text" value={f.function} onChange={e => updateFloor(f.id, 'function', e.target.value)} placeholder="Kinh doanh" /></td>
+                        <td><input type="number" value={f.area} onChange={e => updateFloor(f.id, 'area', e.target.value)} placeholder="0" /></td>
+                        <td><input type="number" step="0.1" value={f.height} onChange={e => updateFloor(f.id, 'height', e.target.value)} placeholder="0.0" /></td>
+                        <td style={{fontWeight: 'bold', textAlign:'right', color: '#ff7733'}}>{vol > 0 ? vol.toFixed(1) : '-'}</td>
+                        <td><input type="number" value={f.headCount} onChange={e => updateFloor(f.id, 'headCount', e.target.value)} placeholder="50" /></td>
+                        <td style={{textAlign:'center'}}>
+                          {currentFloors.length > 1 && <button onClick={() => removeFloor(f.id)} className="btn-remove-floor">X</button>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan="4" style={{textAlign: 'right', fontWeight: 'bold'}}>TỔNG CỘNG:</td>
+                    <td style={{fontWeight: 'bold'}}>{totalFloorArea > 0 ? totalFloorArea : '-'}</td>
+                    <td style={{fontWeight: 'bold'}}>{totalFloorHeight > 0 ? totalFloorHeight.toFixed(1) : '-'}</td>
+                    <td style={{fontWeight: 'bold', color: '#ff7733'}}>{totalVolume > 0 ? totalVolume.toFixed(1) : '-'}</td>
+                    <td colSpan="2"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={handleApplyToAI} 
+                className="btn-apply-table"
+                disabled={isLoading}
+              >
+                {isLoading ? "Đang gửi đi..." : "👉 Tổng hợp Thông Số & Gửi cho Chuyên Gia PCCC"}
+              </button>
             </div>
           </section>
 
