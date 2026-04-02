@@ -60,6 +60,16 @@ async function processDocuments() {
   if (files.length === 0) return console.log(`Chưa có file .pdf nào trong thư mục ${DOCS_DIR}`);
 
   console.log(`Bắt đầu dạy AI học từ ${files.length} tài liệu...`);
+  console.log(`Đang dọn dẹp bộ nhớ cũ...`);
+  
+  // Xóa toàn bộ dữ liệu rác cũ
+  const { error: deleteError } = await supabase.from('pccc_documents').delete().neq('id', 0);
+  if (deleteError) {
+    console.error('Lỗi khi xóa dữ liệu cũ:', deleteError);
+  } else {
+    console.log('Đã làm trống bộ nhớ thành công! Bắt đầu nạp kiến thức mới...');
+  }
+
   
   for (const file of files) {
     console.log(`\nĐang đọc và mổ xẻ nội dung: ${file}`);
