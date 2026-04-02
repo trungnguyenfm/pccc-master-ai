@@ -7,7 +7,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Cấu hình Trí tuệ AI Gemini bằng thư viện Google nguyên bản (Ngăn xung đột Verce-AI v6)
+// Khởi tạo AI với API Key (Ưu tiên v1 ổn định nếu SDK hỗ trợ)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export async function POST(req) {
@@ -15,43 +15,24 @@ export async function POST(req) {
     const { messages, projectInfo } = await req.json();
     const lastMessage = messages[messages.length - 1].content;
 
-    // 1. Dùng mô hình Embedding để tính toán tọa độ vector câu hỏi
-    let contextText = '';
-    try {
-      const embeddingModel = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
-      const { embedding } = await embeddingModel.embedContent(lastMessage);
-      
-      const { data: documents, error } = await supabase.rpc('match_pccc_documents', {
-        query_embedding: embedding.values,
-        match_threshold: 0.60,
-        match_count: 5
-      });
-
-      if (error) throw error;
-      if (documents?.length) {
-        contextText = documents.map(doc => `[Trích tài liệu LUẬT: ${doc.metadata.source}]\n${doc.content}`).join('\n\n');
-      }
-    } catch (err) {
-      console.warn("⚠️ RAG Bypass hoặc Lỗi DB:", err.message);
+    // Log kiểm tra API Key (chỉ log 4 ký tự cuối)
+    if (!process.env.GEMINI_API_KEY) {
+      console.error("CRITICAL: GEMINI_API_KEY is missing!");
+    } else {
+      console.log("AI SYSTEM: Using key ending in:", process.env.GEMINI_API_KEY.slice(-4));
     }
 
-    // 3. Kéo lịch sử chat về định dạng chuẩn của Google (Native)
-    const history = messages.slice(0, -1).map(m => ({
-      role: m.role === 'user' ? 'user' : 'model',
-      parts: [{ text: m.content || '' }]
-    }));
-
-    // Tạo danh sách nguồn có đánh số để gửi về Frontend
     let sourceMap = [];
     let formattedContext = "KHÔNG TÌM THẤY TÀI LIỆU LIÊN QUAN.";
     
     try {
+      // Dùng gemini-pro cho embedding nếu 001 lỗi
       const embeddingModel = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
       const { embedding } = await embeddingModel.embedContent(lastMessage);
       
       const { data: documents, error } = await supabase.rpc('match_pccc_documents', {
         query_embedding: embedding.values,
-        match_threshold: 0.55,
+        match_threshold: 0.52,
         match_count: 5
       });
 
@@ -67,68 +48,80 @@ export async function POST(req) {
       console.warn("RAG Error:", err.message);
     }
 
-    // 4. Nhồi Dữ liệu PCCC vào System Prompt (DỌN DẸP TRIỆT ĐỂ LẶP LỜI)
     const systemInstruction = `Bạn là Chuyên gia PCCC cao cấp.
 QUY TẮC PHẢN HỒI:
-1. TUYỆT ĐỐI KHÔNG lặp lại câu chào, không lặp lại yêu cầu của người dùng. 
-2. Đi thẳng vào nội dung tư vấn theo cấu trúc gạch đầu dòng [1., 2., 3.].
-3. NẾU TRẢ LỜI DỰA TRÊN TÀI LIỆU, bạn BẮT BUỘC phải chèn ký hiệu trích dẫn dạng [^ID] (Ví dụ: [^1], [^2]) vào cuối câu/đoạn trích dẫn. KHÔNG dùng định dạng khác.
-4. Trình bày siêu ngắn gọn, ưu tiên con số và kết luận kỹ thuật.
+1. ĐI THẲNG VÀO NỘI DUNG: Không chào hỏi, không lặp lại yêu cầu. 
+2. TRÍCH DẪN [^ID]: Với mỗi kết luận, chèn ký hiệu [^ID] (Ví dụ: [^1]) vào cuối câu. 
+3. KHÔNG LIỆT KÊ NGUỒN: Tuyệt đối không liệt kê danh sách tài liệu ở cuối (Hệ thống sẽ tự xử lý).
+4. CHỮ KÝ DUY NHẤT: Kết thúc câu trả lời bằng một đường kẻ ngang "---" và nội dung bản quyền sau:
+${AI_SCRIPT.signature}
 
 THÔNG SỐ CÔNG TRÌNH:
-- Quy mô: ${projectInfo?.scale || 'N/A'}
-- Hạng/Bậc: ${projectInfo?.tier || 'A'} / ${projectInfo?.fireResistance || 'I'}
-- Diện tích: ${projectInfo?.totalArea || 'N/A'}
-- Chiều cao PCCC: AI TỰ TÍNH TOÁN DỰA TRÊN BẢNG (Tổng - Hầm - Tum).
+- Quy mô: ${projectInfo?.scale || 'N/A'} - Bậc chịu lửa: ${projectInfo?.fireResistance || 'I'}
+- Tổng diện tích: ${projectInfo?.totalArea || 'N/A'} - Hầm: ${projectInfo?.basementDepth || 0}m - Tum: ${projectInfo?.tumArea || 0}m2
 
-DỮ LIỆU PHÁP LÝ (Hãy dùng các ID này để trích dẫn [^ID]):
+DỮ LIỆU LUẬT (Dùng ID này để trích dẫn [^ID]):
 ${formattedContext}
 
-${AI_SCRIPT.system_role.split('QUY TẮC ĐỌC LUẬT BẮT BUỘC:')[1] || ''}
+${AI_SCRIPT.system_role.split('QUY TẮC PHẢN HỒI BẮT BUỘC:')[1] || ''}
 `;
 
+    // SỬ DỤNG ALIAS "flash-latest" ĐỂ GOOGLE TỰ CHỌN MODEL KHẢ DỤNG NHẤT
     const chatModel = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: 'gemini-flash-latest', 
       systemInstruction
     });
 
+    const history = (messages || []).slice(0, -1).map(m => ({
+      role: m.role === 'user' ? 'user' : 'model',
+      parts: [{ text: m.content || '' }]
+    }));
+
     const chat = chatModel.startChat({ history });
     
-    // 5. Mở Cổng truyền dữ liệu trực tiếp (Streaming)
-    const streamResult = await chat.sendMessageStream(lastMessage);
+    let streamResult;
+    try {
+      streamResult = await chat.sendMessageStream(lastMessage);
+    } catch (apiErr) {
+      console.error("Gemini API Error Detail:", apiErr.message);
+      
+      // FALLBACK SANG PRO NẾU FLASH LỖI
+      if (apiErr.message?.includes('404') || apiErr.message?.includes('not found')) {
+         console.warn("Falling back to gemini-pro-latest...");
+         const fallbackModel = genAI.getGenerativeModel({ model: 'gemini-pro-latest', systemInstruction });
+         const fallbackChat = fallbackModel.startChat({ history });
+         streamResult = await fallbackChat.sendMessageStream(lastMessage);
+      } else if (apiErr.message?.includes('429')) {
+         return new Response('🚨 Google báo: Hết lượt dùng thử miễn phí. Sếp vui lòng đợi 1-2 phút rồi thử lại nhé.', { status: 429 });
+      } else {
+         throw apiErr;
+      }
+    }
 
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // GỬI DANH SÁCH NGUỒN TRƯỚC (Protocol đặc biệt)
           if (sourceMap.length > 0) {
-            const sourcesHeader = `SOURCES_DATA:${JSON.stringify(sourceMap)}@END_SOURCES@`;
-            controller.enqueue(new TextEncoder().encode(sourcesHeader));
+            controller.enqueue(new TextEncoder().encode(`SOURCES_DATA:${JSON.stringify(sourceMap)}@END_SOURCES@`));
           }
-
           for await (const chunk of streamResult.stream) {
-            controller.enqueue(new TextEncoder().encode(chunk.text()));
-          }
-          if (AI_SCRIPT.signature) {
-            controller.enqueue(new TextEncoder().encode('\n' + AI_SCRIPT.signature));
+            const text = chunk.text();
+            if (text) controller.enqueue(new TextEncoder().encode(text));
           }
           controller.close();
         } catch (err) {
+          console.error("Stream Error:", err);
           controller.error(err);
         }
       }
     });
 
     return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'X-Content-Type-Options': 'nosniff',
-        'Cache-Control': 'no-cache',
-      }
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache' }
     });
 
   } catch (error) {
-    console.error('SERVER AI ERROR:', error);
-    return new Response(JSON.stringify({ error: 'Lỗi AI: ' + error.message }), { status: 500 });
+    console.error('SERVER FATAL ERROR:', error);
+    return new Response(JSON.stringify({ error: 'Lỗi máy chủ PCCC: ' + error.message }), { status: 500 });
   }
 }

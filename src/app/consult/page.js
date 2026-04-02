@@ -178,93 +178,19 @@ export default function ConsultDashboard() {
   const totalFloorHeight = currentFloors.reduce((sum, f) => sum + (parseFloat(f.height) || 0), 0);
   const totalVolume = currentFloors.reduce((sum, f) => sum + ((parseFloat(f.area) || 0) * (parseFloat(f.height) || 0)), 0);
 
-  const handleApplyToAI = () => {
-    if (isLoading) return;
-    
-    let promptStr = `Dưới đây là BẢNG THÔNG SỐ CHI TIẾT TỪNG TẦNG do tôi tự định nghĩa:\n\n`;
-    promptStr += `| STT | Tầng | Nhóm cháy | Công năng | Diện tích | Chiều cao | Khối tích | Số người |\n`;
-    promptStr += `|---|---|---|---|---|---|---|---|\n`;
-    
-    currentFloors.forEach((f, i) => {
-      const vol = (parseFloat(f.area) || 0) * (parseFloat(f.height) || 0);
-      promptStr += `| ${i+1} | ${f.title || '-'} | ${f.fireGroup || '-'} | ${f.function || '-'} | ${f.area || 0} m2 | ${f.height || 0} m | ${vol.toFixed(2)} m3 | ${f.headCount || '-'} |\n`;
-    });
-    
-    promptStr += `\n**THÔNG SỐ ĐẶC THÙ KHÁC**:\n`;
-    promptStr += `- Cao độ tầng hầm sâu nhất: âm ${projectInfo.basementDepth || 0} m\n`;
-    promptStr += `- Chiều cao lan can tầng trên cùng: ${projectInfo.railingHeight || 0} m\n`;
-    promptStr += `- Diện tích Tầng Tum: ${projectInfo.tumArea || 0} m2\n\n`;
-
-    promptStr += `**TỔNG CỘNG KHỐI TÍCH & KÍCH THƯỚC**: \n- Tổng diện tích các sàn (Trong bảng tra): ${totalFloorArea} m2\n- Chiều cao xây dựng cộng dồn các tầng: ${totalFloorHeight.toFixed(2)} m\n- KHỐI TÍCH BÊN TRONG CỦA NHÀ LÀ: ${totalVolume.toFixed(2)} m3.\n\n`;
-    promptStr += `Dựa vào Bảng số liệu trên, hãy LẬP TỨC tính toán lại quy mô công trình. Yêu cầu BẮT BUỘC: \n1. Bạn hãy KIỂM TRA BẢNG VÀ TỰ TÍNH: "Chiều cao PCCC" đích thực của công trình bằng bao nhiêu mét? (Hướng dẫn AI: Lấy tổng chiều cao xây dựng TRỪ ĐI tổng chiều cao các tầng hầm, và xét xem Tum có <= 30% sàn dưới không để loại trừ Tum. Nhớ xem xét lan can theo QCVN 06).\n2. Liệt kê NGẮN GỌN từng tầng cần cụ thể mấy Lối thoát nạn.\n3. Tính chuẩn xác lượng nước Vnn.\n4. Kết luận về Chiều cao PCCC này.\n(GHI CHÚ QUAN TRỌNG: Trình bày siêu ngắn gọn từng gạch đầu dòng, GHI THẲNG KẾT QUẢ, tuyệt đối KHÔNG ĐƯỢC lấy Chiều cao cộng dồn làm Chiều cao PCCC!)`;
-    
-    const userMsg = { role: 'user', content: promptStr };
-    setMessages(prev => [...prev, userMsg]);
+  const streamChatResponse = async (chatMessages, currentLength) => {
     setIsLoading(true);
-    
-    fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [...messages, userMsg], projectInfo })
-    }).then(async (response) => {
-        if (!response.ok) throw new Error(await response.text());
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-        setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-
-        let fullText = '';
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          fullText += chunk;
-
-          // XỬ LÝ GIAO THỨC TÁCH NGUỒN (SOURCES)
-          if (fullText.includes('SOURCES_DATA:') && fullText.includes('@END_SOURCES@')) {
-             const parts = fullText.split('@END_SOURCES@');
-             const sourceHeader = parts[0].replace('SOURCES_DATA:', '');
-             try {
-                const sources = JSON.parse(sourceHeader);
-                const assistantMsgIdx = messages.length + 1;
-                setActiveSources(prev => ({ ...prev, [assistantMsgIdx]: sources }));
-             } catch(e) {}
-             fullText = parts[1]; // Chỉ giữ lại phần nội dung chat
-          }
-
-          setMessages(prev => {
-            const newArray = [...prev];
-            const lastMsg = newArray[newArray.length - 1];
-            lastMsg.content = fullText;
-            return newArray;
-          });
-        }
-    }).catch(err => {
-        console.error(err);
-        setMessages(prev => [...prev, { role: 'assistant', content: '❌ Trục trặc hệ thống gửi bảng' }]);
-    }).finally(() => {
-        setIsLoading(false);
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
-
-    const userMsg = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMsg]);
-    setInput('');
-    setIsLoading(true);
-
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [...messages, userMsg], projectInfo })
+        body: JSON.stringify({ messages: chatMessages, projectInfo })
       });
 
       if (!response.ok) throw new Error(await response.text());
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
+      
       setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
       let fullText = '';
@@ -279,25 +205,58 @@ export default function ConsultDashboard() {
            const sourceHeader = parts[0].replace('SOURCES_DATA:', '');
            try {
               const sources = JSON.parse(sourceHeader);
-              const assistantMsgIdx = messages.length + 1;
-              setActiveSources(prev => ({ ...prev, [assistantMsgIdx]: sources }));
-           } catch(e) {}
+              setActiveSources(prev => ({ ...prev, [currentLength + 1]: sources }));
+           } catch(e) { console.error("Source Parse Error:", e); }
            fullText = parts[1];
         }
 
         setMessages(prev => {
           const newArray = [...prev];
-          const lastMsg = newArray[newArray.length - 1];
-          lastMsg.content = fullText;
+          newArray[newArray.length - 1].content = fullText;
           return newArray;
         });
       }
     } catch (err) {
-      console.error(err);
-      setMessages(prev => [...prev, { role: 'assistant', content: '❌ Kết nối tới Não Bộ AI bị gián đoạn. Vui lòng thử lại.' }]);
+      console.error("Chat Stream Error:", err);
+      setMessages(prev => [...prev, { role: 'assistant', content: `❌ Lỗi: ${err.message || 'Kết nối thất bại'}` }]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleApplyToAI = () => {
+    if (isLoading) return;
+    
+    let promptStr = `Dưới đây là BẢNG THÔNG SỐ CHI TIẾT TỪNG TẦNG:\n\n`;
+    promptStr += `| STT | Tầng | Nhóm cháy | Công năng | Diện tích | Chiều cao | Khối tích | Số người |\n`;
+    promptStr += `|---|---|---|---|---|---|---|---|\n`;
+    
+    currentFloors.forEach((f, i) => {
+      const vol = (parseFloat(f.area) || 0) * (parseFloat(f.height) || 0);
+      promptStr += `| ${i+1} | ${f.title || '-'} | ${f.fireGroup || '-'} | ${f.function || '-'} | ${f.area || 0} m2 | ${f.height || 0} m | ${vol.toFixed(2)} m3 | ${f.headCount || '-'} |\n`;
+    });
+    
+    promptStr += `\n**THÔNG SỐ ĐẶC THÙ KHÁC**:\n`;
+    promptStr += `- Cao độ tầng hầm sâu nhất: âm ${projectInfo.basementDepth || 0} m\n`;
+    promptStr += `- Chiều cao lan can tầng trên cùng: ${projectInfo.railingHeight || 0} m\n`;
+    promptStr += `- Diện tích Tầng Tum: ${projectInfo.tumArea || 0} m2\n\n`;
+    promptStr += `Yêu cầu: Tính toán Chiều cao PCCC, Lối thoát nạn và Lượng nước sinh hoạt/PCCC.`;
+    
+    const userMsg = { role: 'user', content: promptStr };
+    const currentLength = messages.length;
+    setMessages(prev => [...prev, userMsg]);
+    streamChatResponse([...messages, userMsg], currentLength);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userMsg = { role: 'user', content: input };
+    const currentLength = messages.length;
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    streamChatResponse([...messages, userMsg], currentLength);
   };
 
   const handleExportPDF = () => {
