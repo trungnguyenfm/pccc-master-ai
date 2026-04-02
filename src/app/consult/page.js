@@ -16,6 +16,7 @@ export default function ConsultDashboard() {
   
   const [projectInfo, setProjectInfo] = useState({
     scale: '', tier: 'A', area: '', fireResistance: 'I', totalArea: '', location: '', height: '', logic: '',
+    basementDepth: '', railingHeight: '', tumArea: '',
     floors: [{ id: Date.now(), title: 'Tầng 1', fireGroup: 'F3.5', function: 'Kinh doanh dịch vụ', area: '110', height: '4.4', headCount: '', escapeRoutes: '' }]
   });
 
@@ -63,6 +64,7 @@ export default function ConsultDashboard() {
     const savedData = localStorage.getItem(key);
     const defaultData = { 
       scale: '', tier: 'A', area: '', fireResistance: 'I', totalArea: '', location: '', height: '', logic: '',
+      basementDepth: '', railingHeight: '', tumArea: '',
       floors: [{ id: Date.now(), title: 'Tầng 1', fireGroup: 'F3.5', function: 'VD: Văn phòng', area: '', height: '', headCount: '', escapeRoutes: '' }]
     };
     if (savedData) {
@@ -173,8 +175,13 @@ export default function ConsultDashboard() {
       promptStr += `| ${i+1} | ${f.title || '-'} | ${f.fireGroup || '-'} | ${f.function || '-'} | ${f.area || 0} m2 | ${f.height || 0} m | ${vol.toFixed(2)} m3 | ${f.headCount || '-'} |\n`;
     });
     
-    promptStr += `\n**TỔNG CỘNG KHỐI TÍCH & DIỆN TÍCH**: \n- Tổng diện tích: ${totalFloorArea} m2\n- Tổng chiều cao: ${totalFloorHeight.toFixed(2)} m\n- KHỐI TÍCH NHÀ LÀ: ${totalVolume.toFixed(2)} m3.\n\n`;
-    promptStr += `Bạn hãy ĐỌC KỸ dữ liệu Bảng trên, từ đó: \n1. Tự động nội suy lại quy mô, khối tích chuẩn.\n2. Tư vấn CỤ THỂ từng tầng cần bao nhiêu Lối thoát nạn.\n3. Tính lại cho tôi lượng nước Vnn dựa TRÊN khối lượng thực tế này.\nKHÔNG ĐƯỢC BỊA RA THÔNG SỐ!`;
+    promptStr += `\n**THÔNG SỐ ĐẶC THÙ KHÁC**:\n`;
+    promptStr += `- Cao độ tầng hầm sâu nhất: âm ${projectInfo.basementDepth || 0} m\n`;
+    promptStr += `- Chiều cao lan can tầng trên cùng: ${projectInfo.railingHeight || 0} m\n`;
+    promptStr += `- Diện tích Tầng Tum: ${projectInfo.tumArea || 0} m2\n\n`;
+
+    promptStr += `**TỔNG CỘNG KHỐI TÍCH & DIỆN TÍCH**: \n- Tổng diện tích: ${totalFloorArea} m2\n- Tổng chiều cao: ${totalFloorHeight.toFixed(2)} m\n- KHỐI TÍCH NHÀ LÀ: ${totalVolume.toFixed(2)} m3.\n\n`;
+    promptStr += `Dựa vào Bảng số liệu và Ghi chú đặc thù trên, hãy NHANH CHÓNG kiểm tra lại quy mô công trình. Yêu cầu: \n1. Liệt kê NGẮN GỌN từng tầng cần cụ thể mấy Lối thoát nạn.\n2. Tính chuẩn xác lượng nước Vnn.\n3. Kết luận về Chiều cao PCCC bị ảnh hưởng thế nào bởi Tum và Lan can.\n(GHI CHÚ QUAN TRỌNG: Trình bày siêu ngắn gọn từng gạch đầu dòng, GHI THẲNG KẾT QUẢ, bỏ qua diễn giải dông dài, tuyệt đối không bịa số liệu!)`;
     
     const userMsg = { role: 'user', content: promptStr };
     setMessages(prev => [...prev, userMsg]);
@@ -344,6 +351,18 @@ export default function ConsultDashboard() {
               <div className="form-group">
                 <label>Chiều cao PCCC (m)</label>
                 <input type="text" value={projectInfo.height} placeholder="45.5" onChange={(e)=>setProjectInfo({...projectInfo, height: e.target.value})}/>
+              </div>
+              <div className="form-group">
+                <label>Hầm âm sâu (m)</label>
+                <input type="number" step="0.1" value={projectInfo.basementDepth} placeholder="VD: 3.5" onChange={(e)=>setProjectInfo({...projectInfo, basementDepth: e.target.value})}/>
+              </div>
+              <div className="form-group">
+                <label>Lan can tầng trên (m)</label>
+                <input type="number" step="0.1" value={projectInfo.railingHeight} placeholder="VD: 1.4" onChange={(e)=>setProjectInfo({...projectInfo, railingHeight: e.target.value})}/>
+              </div>
+              <div className="form-group">
+                <label>Diện tích Tum (m²)</label>
+                <input type="number" value={projectInfo.tumArea} placeholder="VD: 45" onChange={(e)=>setProjectInfo({...projectInfo, tumArea: e.target.value})}/>
               </div>
               <div className="form-group full-width">
                 <label>Công năng / Tum / Hầm</label>
